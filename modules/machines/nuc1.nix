@@ -14,6 +14,10 @@ in
       m.cluster-assertions
       m.microvm-host
       m.k3s-token
+      m.secrets
+      # À activer une fois leur secret chiffré dans secrets/nuc1.yaml :
+      # m.ddns       # cloudflare-ddns-token
+      # m.datadog    # datadog-api-key
       {
         networking.hostName = "nuc1";
         homelab.diskDevice = "/dev/disk/by-id/nvme-KINGSTON_SNVS500G_50026B7685AD8136";

@@ -1,6 +1,11 @@
 # LA topologie. Déplacer un nœud d'un host à l'autre = changer `host` ici.
 {
   cluster = {
+    name = "homelab";
+
+    # Compte Datadog (offre étudiante GitHub Student Pack) : site US1.
+    datadog.site = "datadoghq.com";
+
     # LAN de la Livebox. DHCP de la box : .10–.150 ; tout ce qui suit est hors DHCP.
     #   .200–.209  hosts physiques
     #   .210–.239  nœuds k3s (kube-N = .21N)

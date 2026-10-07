@@ -42,6 +42,16 @@ in
       };
     };
 
+    name = mkOption {
+      type = types.str;
+      description = "Nom du cluster (tags d'observabilité, clusterName Datadog).";
+    };
+
+    datadog.site = mkOption {
+      type = types.str;
+      description = "Site Datadog (région du compte), ex. datadoghq.com (US1), datadoghq.eu.";
+    };
+
     # Repo GitOps suivi par Flux (contenu du cluster : plateforme et apps).
     gitops = {
       url = mkOption {
