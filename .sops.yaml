@@ -1,0 +1,10 @@
+# Secrets du socle (sops-nix). Chaque secret est chiffré pour l'admin ET pour la machine
+# qui le consomme (sa clé SSH d'hôte convertie en age : `ssh-to-age < ssh_host_ed25519_key.pub`).
+# Clé privée de l'admin : ~/.config/sops/age/keys.txt (sauvegarde : KeePassXC).
+keys:
+  - &admin age1s6hy57p80hu633xwvq2408hnh7djhh8chp7jen90uqpyymjg0upqrcg6y4
+  - &nuc1 age1phrk939luastwkp4qy2lvryhu03pwc66wx4ke55ymw457fssqelq2g8j9u
+creation_rules:
+  - path_regex: secrets/nuc1\.yaml$
+    key_groups:
+      - age: [*admin, *nuc1]
