@@ -7,7 +7,7 @@ in
 {
   flake.modules.nixos.microvm-guest = { lib, node, ... }:
     let
-      clusterLib = import ../cluster/_lib.nix { inherit lib; };
+      clusterLib = import ../topology/_lib.nix { inherit lib; };
       spec = cluster.nodes.${node};
     in
     {

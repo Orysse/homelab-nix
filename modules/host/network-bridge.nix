@@ -6,7 +6,7 @@ in
 {
   flake.modules.nixos.network-bridge = { config, lib, ... }:
   let
-    clusterLib = import ../cluster/_lib.nix { inherit lib; };
+    clusterLib = import ../topology/_lib.nix { inherit lib; };
   in
   {
     options.homelab.lanInterface = lib.mkOption {

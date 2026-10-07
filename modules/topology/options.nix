@@ -26,6 +26,36 @@ in
       dns = mkOption { type = types.listOf types.str; default = [ ]; };
     };
 
+    # Point d'entrée HTTP(S) du cluster : une IP annoncée par MetalLB, portée par Traefik.
+    ingress = {
+      address = mkOption {
+        type = types.str;
+        description = "IP du LoadBalancer de Traefik (cible du futur NAT/PAT de la box).";
+      };
+      pool = mkOption {
+        type = types.str;
+        description = "Plage d'IP que MetalLB peut attribuer (doit contenir `address`), ex. 192.168.1.240-192.168.1.254.";
+      };
+      domain = mkOption {
+        type = types.str;
+        description = "Domaine des apps : <app>.<domain>.";
+      };
+    };
+
+    # Repo GitOps suivi par Flux (contenu du cluster : plateforme et apps).
+    gitops = {
+      url = mkOption {
+        type = types.str;
+        description = "URL git (HTTPS, repo public) du repo homelab-cluster.";
+      };
+      branch = mkOption { type = types.str; default = "main"; };
+      path = mkOption {
+        type = types.str;
+        default = "./clusters/homelab";
+        description = "Dossier du repo que Flux applique (point d'entrée du cluster).";
+      };
+    };
+
     hosts = mkOption {
       type = types.attrsOf (types.submodule {
         options = { inherit address; };

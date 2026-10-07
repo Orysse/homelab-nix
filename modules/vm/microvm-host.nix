@@ -7,7 +7,7 @@ in
 {
   flake.modules.nixos.microvm-host = { config, lib, ... }:
     let
-      clusterLib = import ../cluster/_lib.nix { inherit lib; };
+      clusterLib = import ../topology/_lib.nix { inherit lib; };
       nodes = clusterLib.nodesOn cluster config.networking.hostName;
     in
     {

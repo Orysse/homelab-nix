@@ -13,6 +13,19 @@
       dns = [ "192.168.1.1" ];
     };
 
+    # Entrée unique du cluster. Futur PAT de la box : 80/443 -> `address`.
+    # domain : sslip.io résout <x>.192-168-1-240.sslip.io vers 192.168.1.240, sans
+    # configuration DNS. À remplacer par "abelc.eu" une fois le domaine acheté.
+    ingress = {
+      address = "192.168.1.240";
+      pool = "192.168.1.240-192.168.1.254";
+      domain = "192-168-1-240.sslip.io";
+    };
+
+    # Contenu du cluster (plateforme, apps) : repo suivi par Flux. HTTPS : lu sans
+    # identifiants (repo public).
+    gitops.url = "https://github.com/Orysse/homelab-cluster";
+
     hosts = {
       nuc1.address = "192.168.1.200";
     };
