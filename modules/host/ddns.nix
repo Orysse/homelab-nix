@@ -1,6 +1,8 @@
 # DNS dynamique : tient l'enregistrement A du domaine à jour avec l'IP publique de la
 # box (zone chez Cloudflare). Le NUC sort par la box : l'IP vue de l'extérieur est la sienne.
 # Token : API Cloudflare limité à la zone, droit « DNS Edit » (secret sops cloudflare-ddns-token).
+# ddclient MET À JOUR mais ne CRÉE pas : les enregistrements A <domaine> et *.<domaine>
+# (DNS only, nuage gris) doivent exister dans la zone (créés une fois, le 2026-10-08).
 { config, ... }:
 let
   inherit (config) cluster;

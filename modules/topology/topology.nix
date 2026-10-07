@@ -3,8 +3,8 @@
   cluster = {
     name = "homelab";
 
-    # Compte Datadog (offre étudiante GitHub Student Pack) : site US1.
-    datadog.site = "datadoghq.com";
+    # Compte Datadog (offre étudiante GitHub Student Pack) : site US5.
+    datadog.site = "us5.datadoghq.com";
 
     # LAN de la Livebox. DHCP de la box : .10–.150 ; tout ce qui suit est hors DHCP.
     #   .200–.209  hosts physiques
@@ -18,13 +18,13 @@
       dns = [ "192.168.1.1" ];
     };
 
-    # Entrée unique du cluster. Futur PAT de la box : 80/443 -> `address`.
-    # domain : sslip.io résout <x>.192-168-1-240.sslip.io vers 192.168.1.240, sans
-    # configuration DNS. À remplacer par "abelc.eu" une fois le domaine acheté.
+    # Entrée unique du cluster. PAT de la box : 80/443 -> `address`.
+    # domain : zone chez Cloudflare (registrar OVH). abe.lc et *.abe.lc pointent vers
+    # l'IP publique de la box (DNS dynamique, brique ddns).
     ingress = {
       address = "192.168.1.240";
       pool = "192.168.1.240-192.168.1.254";
-      domain = "192-168-1-240.sslip.io";
+      domain = "abe.lc";
     };
 
     # Contenu du cluster (plateforme, apps) : repo suivi par Flux. HTTPS : lu sans

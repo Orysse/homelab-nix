@@ -8,6 +8,22 @@ let
 in
 {
   flake.modules.nixos.datadog = { config, ... }: {
+    # CONTOURNEMENT nixpkgs-unstable (2026-10) : le contrôle de métadonnées Python cherche
+    # « checks-base » au lieu de « datadog-checks-base » et casse le build des intégrations.
+    # À retirer quand `nix build nixpkgs#datadog-agent` repasse.
+    nixpkgs.overlays = [
+      (final: prev: {
+        datadog-integrations-core = extras:
+          prev.callPackage "${prev.path}/pkgs/tools/networking/dd-agent/integrations-core.nix" {
+            extraIntegrations = extras;
+            python3Packages = prev.python3Packages // {
+              buildPythonPackage = args:
+                prev.python3Packages.buildPythonPackage (args // { dontCheckPythonMetadata = true; });
+            };
+          };
+      })
+    ];
+
     sops.secrets.datadog-api-key.owner = "datadog";
 
     services.datadog-agent = {
