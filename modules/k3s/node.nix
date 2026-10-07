@@ -5,20 +5,27 @@
 # données par VM (/var/lib/rancher). /etc/rancher (mot de passe du nœud, kubeconfig)
 # y est redirigé. Ce volume est un disque et non un partage virtiofs, car l'overlayfs
 # de containerd ne fonctionne pas sur virtiofs.
+#
+# Le server bootstrap reçoit en plus la brique `k3s-bootstrap` (flux.nix, manifests.nix) :
+# installation de Flux et ConfigMap cluster-vars. Un seul server l'applique, car k3s ne
+# synchronise pas ses manifests entre servers.
 { config, ... }:
 let
   inherit (config) cluster;
+  bootstrapModule = config.flake.modules.nixos.k3s-bootstrap;
 in
 {
   flake.modules.nixos.k3s-node = { lib, node, ... }:
     let
-      clusterLib = import ../cluster/_lib.nix { inherit lib; };
+      clusterLib = import ../topology/_lib.nix { inherit lib; };
       spec = cluster.nodes.${node};
       bootstrap = clusterLib.bootstrapServer cluster;
       isServer = spec.role == "server";
       isBootstrap = node == bootstrap;
     in
     {
+      imports = lib.optional isBootstrap bootstrapModule;
+
       microvm.volumes = [{
         image = "/var/lib/microvms/${node}/k3s-data.img";
         mountPoint = "/var/lib/rancher";
@@ -40,6 +47,8 @@ in
         # null (DHCP) : k3s prend l'IP de l'interface de la route par défaut.
         nodeIP = spec.address;
         clusterInit = isServer && isBootstrap;
+        # LoadBalancer fourni par MetalLB (platform/metallb.nix), pas par servicelb.
+        disable = lib.optionals isServer [ "servicelb" ];
         # IP statique du server si connue, sinon <server>.local (mDNS).
         serverAddr = lib.optionalString (!isBootstrap)
           "https://${clusterLib.endpointOf bootstrap cluster.nodes.${bootstrap}}:6443";
@@ -59,9 +68,9 @@ in
 
       # Ports : https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
       networking.firewall = {
-        allowedTCPPorts = [ 10250 80 443 ]
+        allowedTCPPorts = [ 10250 80 443 7946 ] # 7946 : memberlist MetalLB
           ++ lib.optionals isServer [ 6443 2379 2380 ];
-        allowedUDPPorts = [ 8472 ]; # flannel vxlan
+        allowedUDPPorts = [ 8472 7946 ]; # flannel vxlan, memberlist MetalLB
         trustedInterfaces = [ "cni0" "flannel.1" ];
       };
     };
