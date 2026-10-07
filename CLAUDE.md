@@ -13,7 +13,9 @@ Datadog : Datadog sera déployé dans le cluster plus tard (phase 2+).
 `kube-1` server (etcd, `clusterInit`), `kube-2`/`kube-3` agents (`modules/k3s/`). PAS encore
 de Longhorn, sops-nix ni Datadog. Pas d'impermanence sur le host (D1 révisée).
 NUC sur le LAN de la Livebox, IP statiques hors DHCP : `nuc1` `.200`, `kube-N` `.21N` (`docs/facts.md`).
-Voir `docs/02-phase2-k3s-preview.md`, `docs/03-decisions-and-open-questions.md` et `docs/facts.md`.
+Voir `docs/04-workloads.md` (frontière socle / GitOps), `docs/03-decisions-and-open-questions.md` et `docs/facts.md`.
+Contenu du cluster (MetalLB, Traefik, apps) : repo `homelab-cluster`, appliqué par Flux. Ne pas le redéclarer ici.
+Point d'entrée : Traefik sur `192.168.1.240` (MetalLB), apps sur `<app>.192-168-1-240.sslip.io`.
 
 Kubeconfig (hors repo) : `~/.kube/configs/homelab-nix.yaml` sur le laptop.
 Quand une phase est terminée, mets à jour cette section.
@@ -31,7 +33,7 @@ Quand une phase est terminée, mets à jour cette section.
    migrer. Le root d'une microVM est un tmpfs jetable.
 2. **Seules les données stateful des applications survivent**, et uniquement elles.
 3. **Une seule source de vérité pour la topologie** : un fichier de données
-   (`modules/cluster/topology.nix`). Déplacer un rôle d'un host à l'autre = changer
+   (`modules/topology/topology.nix`). Déplacer un rôle d'un host à l'autre = changer
    une ligne dans ce fichier, rien d'autre.
 4. **Pas d'hyperviseur classique** (pas de Proxmox/libvirt) : `microvm.nix` uniquement.
 5. **Pas de Terraform** pour le cluster.

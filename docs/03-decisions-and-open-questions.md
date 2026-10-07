@@ -48,3 +48,10 @@ Raison : un état éphémère casse la ré-adhésion des nœuds (mot de passe de
 **D10 bis — sops-nix** : clé age dérivée de la clé SSH d'hôte ? À mettre en place avant d'ajouter d'autres secrets.
 
 **D12 — Où vit le repo et comment les mises à jour d'inputs sont gérées** (Renovate/CI auto-hébergée plus tard ?).
+
+**D14 (2026-10-07) — Socle en Nix, contenu du cluster en GitOps (Flux).**
+Ce repo s'arrête à k3s + Flux installé ; MetalLB, Traefik et les apps sont dans `homelab-cluster`
+(public, GitHub), appliqué par Flux. Raison : déclarés en Nix, les manifests faisaient partie
+de la config de la VM `kube-1` — chaque changement d'app redémarrait le control-plane. Le réseau
+reste défini une seule fois (topologie Nix) et passe au cluster par la ConfigMap `cluster-vars`.
+Alternatives écartées : Argo CD (plus lourd en RAM), apps dans le même repo (mélange des outils).

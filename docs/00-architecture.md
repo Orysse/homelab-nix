@@ -41,7 +41,7 @@ Conséquences :
 
 C'est la pièce centrale pour « si je change le code, le control-plane est là et plus là où il était ».
 
-Un fichier `modules/cluster/topology.nix` contient la seule description de qui tourne où :
+Un fichier `modules/topology/topology.nix` contient la seule description de qui tourne où :
 
 ```nix
 # schéma indicatif — à affiner à l'implémentation
@@ -77,7 +77,7 @@ Règles :
 
 ## 5. Stockage
 
-- **Host** : pas d'impermanence. NVMe unique : ESP 1 Go + btrfs en sous-volumes `@root`, `@nix`, `@log`, `@microvms` (voir `modules/system/disk-layout.nix`). Pas de LUKS en phase 1 (voir D2).
+- **Host** : pas d'impermanence. NVMe unique : ESP 1 Go + btrfs en sous-volumes `@root`, `@nix`, `@log`, `@microvms` (voir `modules/host/disk-layout.nix`). Pas de LUKS en phase 1 (voir D2).
 - **VM** : aucun volume en phase 1, hormis le petit partage d'identité (D4).
 - **Phase 2** : les données applicatives vont dans Longhorn. Attention, Longhorn réplique *entre nœuds* mais, avec un seul host physique, les trois répliques sont sur le même disque : **la réplication n'est pas un backup**. La cible de backup prévue est le NAS Synology du propriétaire, à intervalle raisonnable (« ne pas le tabasser »).
 - Longhorn exigera un vrai disque par nœud pour `/var/lib/longhorn`. Ce sera le seul cas légitime de volume (`.img`) par VM : c'est un volume de *données*, pas une image de VM.

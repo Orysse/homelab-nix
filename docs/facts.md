@@ -11,7 +11,7 @@
 | Adressage statique (hors DHCP) | `.200`–`.209` hosts (`nuc1` = `.200`) ; `.210`–`.239` nœuds k3s (`kube-N` = `.21N`) ; `.240`–`.254` réservé (LoadBalancer) |
 | mDNS | `nuc1.local`, `kube-N.local` résolus par systemd-resolved (host + VMs) |
 | IPv6 | la box annonce un préfixe opérateur ; désactivé dans les VMs (`IPv6AcceptRA = false`) pour que k3s reste en IPv4 |
-| NIC du NUC | `eno1` (e1000e, intégrée). Aussi : `enp57s0u1u4u2c2` (USB cdc_ncm, non pontée), Wi-Fi iwlwifi (`wlan0` sous iwd, brique `wifi-uplink` désactivée) |
+| NIC du NUC | `eno1` (e1000e, intégrée). Aussi : `enp57s0u1u4u2c2` (USB cdc_ncm, non pontée), Wi-Fi iwlwifi (non configuré) |
 | Fuseau / clavier | `Europe/Paris`, `us` |
 | Accès | root par clé `~/.ssh/id_ed25519.pub` du laptop (abel@thinkpad) ; mot de passe root console défini à la main sur le NUC (hors repo) |
 | Kubeconfig | `~/.kube/configs/homelab-nix.yaml` sur le laptop (hors repo) |
@@ -25,8 +25,3 @@ Câble direct NUC ↔ laptop, puis `ping -6 ff02::1%<iface>` : le `br0` du NUC r
 `nmcli connection add save no type ethernet ifname <iface> con-name nuc-direct ipv4.method link-local ipv6.method link-local`.
 Pour `nixos-rebuild` via un lien local : `NIX_SSHOPTS="-o HostName=fe80::…%%<iface>" … --target-host root@nuc1`
 (`%%` : ssh interprète `%` comme un jeton).
-
-## Uplink Wi-Fi temporaire (désactivé)
-
-Brique `wifi-uplink` : le NUC sort par son Wi-Fi (iwd, identifiants hors repo dans `/var/lib/iwd`)
-et NAT `br0` ; la passerelle du subnet devient alors l'IP du host.
