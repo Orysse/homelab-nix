@@ -52,6 +52,7 @@ in
         DD_SITE = cluster.datadog.site;
         DOMAIN = cluster.ingress.domain;
         INGRESS_ADDRESS = cluster.ingress.address;
+        INTERNAL_ADDRESS = cluster.ingress.internalAddress;
         INGRESS_POOL = cluster.ingress.pool;
       };
     }];

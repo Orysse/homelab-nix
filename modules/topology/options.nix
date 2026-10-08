@@ -27,6 +27,10 @@ in
         type = types.str;
         description = "Traefik's LoadBalancer IP (target of the router's port forwarding).";
       };
+      internalAddress = mkOption {
+        type = types.str;
+        description = "Traefik's second LoadBalancer IP, for internal apps (*.int.<domain>). Must NOT be port-forwarded.";
+      };
       pool = mkOption {
         type = types.str;
         description = "IP range MetalLB may assign (must contain `address`), e.g. 192.168.1.240-192.168.1.254.";

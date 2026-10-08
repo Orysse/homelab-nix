@@ -18,6 +18,7 @@
     # Router port forwarding: TCP 80/443 -> address.
     ingress = {
       address = "192.168.1.240";
+      internalAddress = "192.168.1.241"; # VPN/LAN only: not port-forwarded
       pool = "192.168.1.240-192.168.1.254";
       domain = "abe.lc";
     };
