@@ -5,6 +5,11 @@ let
 in
 {
   flake.modules.nixos.datadog = { config, ... }: {
+    systemd.tmpfiles.rules = [
+      "d /var/lib/datadog-agent/run 0750 datadog datadog -"
+      "d /run/datadog 0755 datadog datadog -"
+    ];
+
     # WORKAROUND nixpkgs-unstable (2026-10): pythonMetadataCheck looks for "checks-base"
     # instead of "datadog-checks-base". Remove once nixpkgs#datadog-agent builds again.
     nixpkgs.overlays = [
@@ -29,6 +34,20 @@ in
       hostname = config.networking.hostName;
       tags = [ "cluster:${cluster.name}" "env:homelab" "role:hypervisor" ];
       enableLiveProcessCollection = true;
+      # Packaging paths (/opt/datadog-agent/run, /var/run/datadog) do not exist on NixOS.
+      extraConfig = {
+        run_path = "/var/lib/datadog-agent/run";
+        dogstatsd_socket = "/run/datadog/dsd.socket";
+      };
+      # The module's default sets use_mount = "false" (a string): the Go disk check rejects
+      # it and the agent logs an error before falling back to the Python check.
+      diskCheck = {
+        init_config = { };
+        instances = [{
+          use_mount = false;
+          file_system_global_exclude = [ "tmpfs" "devtmpfs" "ramfs" "overlay" "efivarfs" ];
+        }];
+      };
     };
   };
 }
