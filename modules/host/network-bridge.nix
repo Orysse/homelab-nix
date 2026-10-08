@@ -10,7 +10,7 @@ in
   {
     options.homelab.lanInterface = lib.mkOption {
       type = lib.types.str;
-      description = "NIC filaire du host, esclave de br0.";
+      description = "Host wired NIC, enslaved to br0.";
     };
 
     config = {
@@ -37,8 +37,8 @@ in
 
       services.resolved.settings.Resolve.MulticastDNS = "yes";
 
-      # Ne filtre que le trafic destiné au host : le trafic ponté vers les VMs ne
-      # traverse pas netfilter (pas de br_netfilter).
+      # Only filters traffic addressed to the host: bridged traffic to the VMs does not
+      # go through netfilter (no br_netfilter).
       networking.firewall.enable = true;
       networking.firewall.allowedUDPPorts = [ 5353 ];
     };

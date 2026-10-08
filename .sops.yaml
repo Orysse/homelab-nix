@@ -1,4 +1,4 @@
-# Machines : clé SSH d'hôte convertie en age (ssh-to-age < ssh_host_ed25519_key.pub).
+# Machines: SSH host key converted to age (ssh-to-age < ssh_host_ed25519_key.pub).
 keys:
   - &abel_age age1uzjc82ya0szkyht2txxjsk03csk7cpap524lz9v8gjxsaqxlaejsr3tkcc
   - &abel_yubikey age1yubikey1q23p5ysmjm8ukvad9xefunvaq7fz06zsf72jr0vj20z2j48sjjh2jm256cs

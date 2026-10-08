@@ -1,57 +1,68 @@
-# Décisions et questions ouvertes
+# Decisions and open questions
 
-Format : décision, raison, alternative écartée. « Ouvert » = à trancher avec le propriétaire.
+Format: decision, reason, rejected alternative. "Open" = to be settled with the owner.
 
-## Décisions prises
+## Decisions
 
-**D1 (révisée le 2026-10-07) — Pas d'impermanence sur le host.**
-Décision du propriétaire : preservation et root tmpfs retirés pour simplifier. Le host a un disque btrfs classique en sous-volumes (`@root` → `/`, `@nix`, `@log` → `/var/log`, `@microvms` → `/var/lib/microvms`) : on peut snapshoter/restaurer `@root` sans toucher au store, aux logs ni à l'état des VMs. Les **VMs** gardent leur root tmpfs (défaut microvm.nix) : le principe central est inchangé.
+**D1 (revised 2026-10-07) — No impermanence on the host.**
+Owner's decision: preservation and tmpfs root removed for simplicity. The host has a regular btrfs disk with subvolumes (`@root` → `/`, `@nix`, `@log` → `/var/log`, `@microvms` → `/var/lib/microvms`): `@root` can be snapshotted/restored without touching the store, the logs or the VMs' state. The **VMs** keep their tmpfs root (microvm.nix default): the core principle is unchanged.
 
-**D2 — Pas de LUKS en phase 1.**
-Raison : un disque chiffré par passphrase empêche le redémarrage non assisté du host, alors que « reboot du host → tout revient seul » est un critère central. Alternative pour plus tard : déverrouillage TPM2 ou déverrouillage distant dans l'initrd.
+**D2 — No LUKS for now.**
+Reason: a passphrase-encrypted disk prevents unattended host reboots, while "host reboot → everything comes back on its own" is a core criterion. Alternative for later: TPM2 unlock or remote unlock in the initrd.
 
-**D3 — VMs directement sur le LAN (bridge), IP statiques.**
-Raison : c'est le modèle documenté upstream et il permet à des VMs sur des hosts différents de se voir sans routage. Contrainte : host en Ethernet filaire. Alternative écartée : bridge privé + NAT par host (plus simple en solo mais casse la connectivité inter-hosts).
+**D3 — VMs directly on the LAN (bridge), static IPs.**
+Reason: the upstream-documented model, and it lets VMs on different hosts reach each other without routing. Constraint: the host must be on wired Ethernet. Rejected alternative: private bridge + NAT per host (simpler alone, but breaks inter-host connectivity).
 
-**D4 — Identité des VMs : petit partage virtiofs par VM (phase 1).**
-Une VM doit garder les mêmes clés SSH d'hôte entre redémarrages, sinon avertissements `known_hosts` à chaque boot. On partage `/var/lib/microvms/<nom>/persist` du host vers `/persist` de l'invité (✅ dossier source créé par les tmpfiles du module host microvm.nix). C'est du *volume*, pas une image de VM.
-Limite connue : si le nœud change de host, ce dossier doit suivre (ou on accepte de régénérer). Cible : clé d'hôte fournie comme secret (sops-nix) → VM réellement sans état.
-✅ virtiofsd tourne en root côté host (service `microvm-virtiofsd@`, sans `User=`) avec `--posix-acl --xattr` par défaut : pas de problème d'uid attendu, à confirmer en G2.
-✅ `machine-id` : `microvm.machineId` vaut par défaut un UUID dérivé du hostname et écrit `/etc/machine-id`. Rien à faire.
+**D4 — VM identity: a small virtiofs share per VM.**
+A VM must keep the same SSH host keys across restarts, otherwise `known_hosts` warnings at every boot. `/var/lib/microvms/<name>/persist` on the host is shared to `/persist` in the guest (✅ source directory created by the microvm.nix host module's tmpfiles). It is a *volume*, not a VM image.
+Known limit: if the node changes host, this directory must follow (or keys are regenerated).
+✅ virtiofsd runs as root on the host (`microvm-virtiofsd@` service, no `User=`) with `--posix-acl --xattr` by default: no uid issues.
+✅ `machine-id`: `microvm.machineId` defaults to a UUID derived from the hostname and writes `/etc/machine-id`.
 
-**D5 — VMs déclarées en style `config` (dans la closure du host).**
-Raison : s'intègre naturellement au dendritic pattern et au `nixos-rebuild` du host. ✅ La doc dit que le répertoire d'état `/var/lib/microvms/<nom>` n'est créé qu'une fois.
-(a) ✅ `restartIfChanged` vaut `true` par défaut en style `config` ; à démontrer en G6. (b) sans objet : `/var/lib/microvms` est un sous-volume btrfs persistant.
+**D5 — VMs declared in `config` style (inside the host closure).**
+Reason: fits the dendritic pattern and the host's `nixos-rebuild` naturally. ✅ `restartIfChanged` defaults to `true` in `config` style (verified at G6).
 
-**D6 — Hyperviseur qemu.**
-Raison : supporte virtiofs et 9p, le plus compatible. (✅ firecracker n'a ni 9p ni virtiofs ; cloud-hypervisor pas de 9p.)
+**D6 — qemu hypervisor.**
+Reason: supports virtiofs and 9p, the most compatible. (✅ firecracker has neither 9p nor virtiofs; cloud-hypervisor has no 9p.)
 
-**D7 — Pas d'overlay de store inscriptible.**
-Raison : les VMs ne buildent pas ; l'overlay exige un volume (✅) donc une image — contraire au principe central.
-Le seul volume par VM est le volume de *données* k3s (D9).
+**D7 — No writable store overlay.**
+Reason: VMs do not build; the overlay requires a volume (✅), hence an image — contrary to the core principle. The only per-VM volume is the k3s *data* volume (D9).
 
-**D8 — Premier déploiement avec nixos-anywhere** (disko + install en une commande), ensuite `nixos-rebuild --target-host`.
-Alternative : installation manuelle depuis l'ISO. Outil de déploiement multi-hosts (colmena, deploy-rs…) à reconsidérer quand il y aura un 2e host.
+**D8 — First deployment with nixos-anywhere** (disko + install in one command), then `nixos-rebuild --target-host`.
+Multi-host deployment tool (colmena, deploy-rs…) to reconsider once there is a second host.
 
-**D9 (2026-10-07) — État k3s sur un volume de données par VM.**
-`microvm.volumes` : `/var/lib/microvms/<vm>/k3s-data.img` (ext4, fichier creux, `dataDisk` Mio dans la topologie, défaut 20 Gio, attribut btrfs `+C`) monté sur `/var/lib/rancher` ; `/etc/rancher` est un lien vers `/var/lib/rancher/etc`. Le root reste un tmpfs.
-Raison : un état éphémère casse la ré-adhésion des nœuds (mot de passe de nœud rejeté) et met les images en RAM ; virtiofs ne convient pas (overlayfs de containerd). etcd est donc persistant.
+**D9 (2026-10-07) — k3s state on a data volume per VM.**
+`microvm.volumes`: `/var/lib/microvms/<vm>/k3s-data.img` (ext4, sparse file, `dataDisk` MiB in the topology, 20 GiB default, btrfs `+C` attribute) mounted on `/var/lib/rancher`; `/etc/rancher` is a link to `/var/lib/rancher/etc`. The root stays a tmpfs.
+Reason: ephemeral state breaks node re-joining (node password rejected) and keeps images in RAM; virtiofs does not work for it (containerd overlayfs). etcd is therefore persistent.
 
-**D10 (provisoire) — Token k3s : fichier hors repo.** Le service host `homelab-k3s-token` génère `/var/lib/homelab/k3s-token` une fois et le copie dans `/persist` de chaque VM avant son démarrage. Cible : sops-nix.
+**D10 (provisional) — k3s token: file outside the repository.** The `homelab-k3s-token` host service generates `/var/lib/homelab/k3s-token` once and copies it into each VM's `/persist` before it starts. Target: sops-nix.
 
-**D11 (2026-10-07) — RAM : kube-1 4000 Mo, agents 3000 Mo** (10 Go réservés sur 16). À revoir avec Longhorn + Datadog.
+**D11 (2026-10-07) — RAM: kube-1 4000 MB, agents 3000 MB** (10 GB reserved out of 16).
 
-**D13 — Réseau invité matché par MAC, interfaces CNI non gérées.** `Type = "ether"` matchait aussi les veth des pods : networkd leur mettait l'IP du nœud et cassait le réseau des pods. `20-lan` matche la MAC dérivée ; `veth*`, `cni0`, `flannel*` sont `Unmanaged`.
+**D13 — Guest network matched by MAC, CNI interfaces unmanaged.** `Type = "ether"` also matched the pods' veths: networkd gave them the node's IP and broke pod networking. `20-lan` matches the derived MAC; `veth*`, `cni0`, `flannel*` are `Unmanaged`.
 
-## Questions ouvertes
+**D14 (2026-10-07) — Base in Nix, cluster content in GitOps (Flux).**
+This repository stops at k3s + Flux; MetalLB, Traefik, cert-manager, Datadog and the apps live in `homelab-cluster` (public, GitHub), applied by Flux. Reason: declared in Nix, the manifests were part of the `kube-1` VM configuration — every app change restarted the control plane. The network stays defined once (Nix topology) and reaches the cluster through the `cluster-vars` ConfigMap.
+Rejected alternatives: Argo CD (heavier on RAM), apps in the same repository (mixing tools).
 
-**D10 bis — sops-nix** : clé age dérivée de la clé SSH d'hôte ? À mettre en place avant d'ajouter d'autres secrets.
+**D15 (2026-10-08) — Domain `abe.lc`: registrar OVH, DNS at Cloudflare.**
+Cloudflare's API is natively supported by cert-manager (no webhook) and by ddclient, with zone-scoped tokens. Keeping the registrar separate means the DNS provider can be changed without transferring the domain. DNSSEC enabled (DS published through OVH).
 
-**D12 — Où vit le repo et comment les mises à jour d'inputs sont gérées** (Renovate/CI auto-hébergée plus tard ?).
+**D16 (2026-10-08) — Exposure through router port forwarding.**
+TCP 80/443 → `192.168.1.240` (MetalLB IP of Traefik), UDP 51820 → nuc1 (VPN). Records are DNS-only (no Cloudflare proxy); the public IP is kept up to date by ddclient on nuc1. Rejected for now: Cloudflare Tunnel, VPS relay.
 
-**D14 (2026-10-07) — Socle en Nix, contenu du cluster en GitOps (Flux).**
-Ce repo s'arrête à k3s + Flux installé ; MetalLB, Traefik et les apps sont dans `homelab-cluster`
-(public, GitHub), appliqué par Flux. Raison : déclarés en Nix, les manifests faisaient partie
-de la config de la VM `kube-1` — chaque changement d'app redémarrait le control-plane. Le réseau
-reste défini une seule fois (topologie Nix) et passe au cluster par la ConfigMap `cluster-vars`.
-Alternatives écartées : Argo CD (plus lourd en RAM), apps dans le même repo (mélange des outils).
+**D17 (2026-10-08) — HTTPS: cert-manager, DNS-01 via Cloudflare, wildcard certificate.**
+A single `*.abe.lc` certificate served by default by Traefik (TLSStore `default`); HTTP redirects to HTTPS. DNS-01 does not depend on the cluster being reachable.
+
+**D18 (2026-10-08) — Secrets: sops + age everywhere.**
+Recipients: the owner's software age key (itself encrypted for their YubiKey in `nix-secrets`) and YubiKey, plus the consuming machine (SSH host key converted to age). sops-nix on the host, Flux decryption in the cluster.
+
+**D19 (2026-10-08) — Datadog on the US5 site.** Agent on nuc1 (Nix) and in the cluster (Datadog Operator), same cluster tag. Workaround in place for a nixpkgs-unstable build failure of the Python integrations.
+
+**D20 (2026-10-08) — Admin VPN: WireGuard on nuc1**, `10.250.0.0/24` (`10.100.0.0/24` is used by a school tunnel). Clients only route `192.168.1.192/26`, so remote LANs in `192.168.1.0/24` are not shadowed.
+
+## Open questions
+
+**D12 — Repository hosting and input updates.** `homelab-cluster` is on GitHub; `homelab-nix` is local only. Update process for flake inputs, charts and images (Renovate? scheduled `nix flake update`?) still to decide.
+
+**Security audit (2026-10-08)** — pending fixes: YubiKey-backed SSH key for root, forward filtering on the VPN, encrypted flannel backend, dedicated Flux age key, signed commits verification, k3s secrets encryption, HTTP security headers and CAA record.

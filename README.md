@@ -1,64 +1,66 @@
 # homelab-nix
 
-Le **socle** du homelab : un NUC sous NixOS qui fait tourner trois microVMs
-([microvm.nix](https://github.com/microvm-nix/microvm.nix)), qui forment un cluster k3s.
-Tout est déclaré dans ce flake ; une VM n'a pas d'image disque, elle est reconstruite
-depuis le code (root en tmpfs), seules les données k3s survivent sur un volume.
+The homelab **base**: a NUC running NixOS that hosts three microVMs
+([microvm.nix](https://github.com/microvm-nix/microvm.nix)) forming a k3s cluster.
+Everything is declared in this flake. A VM has no disk image: it is rebuilt from code
+(tmpfs root), and only k3s data survives, on a volume.
 
-Ce repo s'arrête au cluster k3s qui démarre, avec Flux installé. **Ce qui tourne dedans**
-(plateforme et apps) vit dans le repo `homelab-cluster`, appliqué par Flux (GitOps). Le socle
-lui passe les paramètres réseau via la ConfigMap `cluster-vars` (voir `docs/04-workloads.md`).
+This repository stops at a running k3s cluster with Flux installed. **What runs inside it**
+(platform and apps) lives in the `homelab-cluster` repository, applied by Flux (GitOps). The
+base hands it the network parameters through the `cluster-vars` ConfigMap (see
+`docs/04-workloads.md`).
 
-## Couches
+## Layers
 
 ```
- LAN Livebox 192.168.1.0/24
+ LAN 192.168.1.0/24
    │
    ├── nuc1  192.168.1.200          NixOS · br0 · microvm.nix          modules/host, modules/vm
    │     ├── kube-1  .211  server   ┐
    │     ├── kube-2  .212  agent    ├─ k3s                             modules/k3s
    │     └── kube-3  .213  agent    ┘
    │
-   └── 192.168.1.240                entrée HTTP(S) : MetalLB -> Traefik
+   └── 192.168.1.240                HTTP(S) entry point: MetalLB -> Traefik
 ```
 
-| Couche | Outil | Où |
+| Layer | Tool | Where |
 |---|---|---|
-| Machines : host, VMs, k3s | Nix (`nixos-rebuild`) | ce repo |
-| Contenu du cluster : plateforme, apps | Flux (git push) | `homelab-cluster` |
-| Code des apps (ex. le site) | CI -> image | repo de chaque app |
+| Machines: host, VMs, k3s | Nix (`nixos-rebuild`) | this repository |
+| Cluster content: platform, apps | Flux (git push) | `homelab-cluster` |
+| Application code (e.g. the site) | CI -> image | each app's repository |
 
-## Où trouver quoi
+## Layout
 
 ```
-flake.nix                  minimal : import-tree ./modules (dendritic pattern, flake-parts)
-hardware/nuc1.nix          généré par nixos-generate-config (hors modules/ : pas un module flake-parts)
+flake.nix                  minimal: import-tree ./modules (dendritic pattern, flake-parts)
+hardware/nuc1.nix          from nixos-generate-config (outside modules/: not a flake-parts module)
+secrets/nuc1.yaml          host secrets, encrypted with sops (see .sops.yaml)
 modules/
-├─ topology/topology.nix   LA source de vérité : réseau, hosts, nœuds, point d'entrée
-├─ topology/               son schéma (options.nix), ses helpers (_lib.nix), ses contrôles (assertions.nix)
-├─ host/                   briques du host physique : disque, boot, ssh, bridge réseau
-├─ vm/                     microVMs générées depuis la topologie (host + base invité)
-├─ k3s/                    nœud k3s (rôle server/agent), token, installation de Flux
-└─ machines/nuc1.nix       composition d'un host physique : quelles briques, quel disque, quelle NIC
+├─ topology/topology.nix   THE source of truth: network, hosts, nodes, entry point, VPN
+├─ topology/               its schema (options.nix), helpers (_lib.nix), checks (assertions.nix)
+├─ host/                   physical host modules: disk, boot, ssh, bridge, secrets, VPN, DDNS, Datadog
+├─ vm/                     microVMs generated from the topology (host side + guest base)
+├─ k3s/                    k3s node (server/agent role), token, Flux bootstrap
+└─ machines/nuc1.nix       composition of a physical host: which modules, which disk, which NIC
 docs/
-├─ 00-architecture.md      principes
-├─ 03-decisions-…md        décisions (Dn) et questions ouvertes
-├─ 04-workloads.md         frontière socle / GitOps (Flux, cluster-vars)
-└─ facts.md                matériel, réseau, adressage
+├─ 00-architecture.md      principles
+├─ 03-decisions-…md        decisions (Dn) and open questions
+├─ 04-workloads.md         base / GitOps boundary (Flux, cluster-vars)
+└─ facts.md                hardware, network, addressing
 ```
 
-Chaque fichier sous `modules/` est un module flake-parts qui déclare une brique
-`flake.modules.nixos.<nom>` ; `machines/<host>.nix` les compose. Fichiers préfixés `_` :
-helpers ignorés par import-tree.
+Each file under `modules/` is a flake-parts module declaring a `flake.modules.nixos.<name>`
+building block; `machines/<host>.nix` composes them. Files prefixed with `_` are helpers
+ignored by import-tree.
 
-## Commandes
+## Commands
 
 ```bash
-nix flake check                                                         # évaluation + tests de topologie
-nix build .#nixosConfigurations.nuc1.config.system.build.toplevel       # build complet (host + VMs)
-nixos-rebuild switch --flake .#nuc1 --target-host root@192.168.1.200     # déployer
-ssh root@192.168.1.211 k3s kubectl get nodes                            # état du cluster
+nix flake check                                                         # evaluation + topology tests
+nix build .#nixosConfigurations.nuc1.config.system.build.toplevel       # full build (host + VMs)
+nixos-rebuild switch --flake .#nuc1 --target-host root@192.168.1.200     # deploy
+ssh root@192.168.1.211 k3s kubectl get nodes                            # cluster status
 ```
 
-Changer une IP, la RAM d'un nœud, déplacer un nœud sur un autre host : une ligne dans
+Changing an IP, a node's RAM, or moving a node to another host is a one-line change in
 `modules/topology/topology.nix`.

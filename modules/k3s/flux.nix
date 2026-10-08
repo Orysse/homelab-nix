@@ -1,5 +1,5 @@
-# Frontière du socle : le contenu du cluster vit dans homelab-cluster (Flux).
-# cluster-vars expose la topologie aux manifests (${DOMAIN}, ${INGRESS_ADDRESS}…).
+# Boundary of the base: cluster content lives in homelab-cluster (Flux).
+# cluster-vars exposes the topology to the manifests (${DOMAIN}, ${INGRESS_ADDRESS}…).
 { config, ... }:
 let
   inherit (config) cluster;

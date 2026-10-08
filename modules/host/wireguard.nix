@@ -1,5 +1,5 @@
-# Sur le host et non dans k3s : l'accès d'admin doit survivre à une panne du cluster.
-# NAT vers br0 : le LAN répond au host, pas de route de retour à configurer.
+# On the host rather than in k3s: admin access must survive a cluster outage.
+# NAT to br0: the LAN replies to the host, no return route to configure.
 { config, ... }:
 let
   inherit (config) cluster;

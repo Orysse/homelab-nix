@@ -4,7 +4,7 @@
     boot.loader.systemd-boot.configurationLimit = 20;
     boot.loader.efi.canTouchEfiVariables = true;
     boot.initrd.systemd.enable = true;
-    # Pas de swap disque : la RAM des VMs est réservée, zram suffit en filet.
+    # No disk swap: VM RAM is reserved, zram is enough as a safety net.
     zramSwap.enable = true;
   };
 }

@@ -1,42 +1,45 @@
-# Contenu du cluster : frontière socle / GitOps
+# Cluster content: base / GitOps boundary
 
-Ce repo (le socle) s'arrête à un cluster k3s qui tourne et à **Flux installé**. Tout ce qui
-tourne dans le cluster — MetalLB, config de Traefik, apps — vit dans le repo
-`homelab-cluster` et est appliqué par Flux à chaque `git push`.
+This repository (the base) stops at a running k3s cluster with **Flux installed**. Everything
+that runs inside the cluster — MetalLB, Traefik configuration, cert-manager, Datadog, apps —
+lives in the `homelab-cluster` repository and is applied by Flux on every `git push`.
 
-Raison (D14) : les manifests déclarés en Nix font partie de la config de la VM `kube-1` ;
-chaque modification d'app reconstruisait et **redémarrait le control-plane**. Nix gère les
-machines, Flux gère le contenu.
+Reason (D14): manifests declared in Nix are part of the `kube-1` VM configuration; every app
+change rebuilt and **restarted the control plane**. Nix manages the machines, Flux manages
+the content.
 
-## Ce que le socle déclare (modules/k3s/)
+## What the base declares (modules/k3s/)
 
-| Fichier | Rôle |
+| File | Role |
 |---|---|
-| `flux.nix` | chart Helm `flux2` figé (version + hash), `GitRepository` + `Kustomization` vers `cluster.gitops`, ConfigMap `cluster-vars` |
-| `manifests.nix` | `homelab.k3s.manifests.<nom>` -> `<nom>.json` dans le dossier de manifests de k3s ; retire au démarrage les manifests qui ne sont plus déclarés |
-| `node.nix` | rôle server/agent, volume de données, `servicelb` désactivé (MetalLB le remplace) |
+| `flux.nix` | pinned `flux2` Helm chart (version + hash), `GitRepository` + `Kustomization` pointing to `cluster.gitops`, `cluster-vars` ConfigMap |
+| `flux-sops.nix` | Flux's sops decryption key, derived from kube-1's SSH host key |
+| `manifests.nix` | `homelab.k3s.manifests.<name>` -> `<name>.json` in k3s's manifests directory; removes manifests that are no longer declared when k3s starts |
+| `node.nix` | server/agent role, data volume, `servicelb` disabled (replaced by MetalLB) |
 
-Le tout n'est appliqué que par le server bootstrap (`kube-1`).
+All of it is applied by the bootstrap server (`kube-1`) only.
 
-## Le pont : cluster-vars
+## The bridge: cluster-vars
 
-Le réseau reste défini une seule fois, dans `modules/topology/topology.nix`. Le socle en
-publie les valeurs utiles au cluster dans `flux-system/cluster-vars`, que Flux substitue :
+The network stays defined once, in `modules/topology/topology.nix`. The base publishes the
+values the cluster needs in `flux-system/cluster-vars`, which Flux substitutes:
 
-| Topologie | Variable dans homelab-cluster |
+| Topology | Variable in homelab-cluster |
 |---|---|
+| `cluster.name` | `${CLUSTER_NAME}` |
+| `cluster.datadog.site` | `${DD_SITE}` |
 | `cluster.ingress.domain` | `${DOMAIN}` |
 | `cluster.ingress.address` | `${INGRESS_ADDRESS}` |
 | `cluster.ingress.pool` | `${INGRESS_POOL}` |
 
-Changer le domaine (ex. passer à `abelc.eu`) = une ligne dans la topologie + `nixos-rebuild`.
+Changing the domain = one line in the topology + `nixos-rebuild`.
 
-## Pourquoi JSON (manifests.nix)
+## Why JSON (manifests.nix)
 
-`services.k3s.manifests.<x>.content` est écrit en YAML par le module nixpkgs, dont le
-générateur replie les longues chaînes en coupant au milieu d'échappements (`\\` -> `\ \`,
-vu sur le contenu d'une ConfigMap). On écrit nos manifests en JSON : rien n'est replié.
+`services.k3s.manifests.<x>.content` is written as YAML by the nixpkgs module, whose generator
+folds long strings in the middle of escape sequences (`\\` -> `\ \`, seen in a ConfigMap's
+content). Our manifests are written as JSON: nothing is folded.
 
-## Ajouter une app
+## Adding an app
 
-Dans `homelab-cluster` (voir son README), pas ici.
+In `homelab-cluster` (see its README), not here.

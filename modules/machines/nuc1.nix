@@ -21,7 +21,7 @@ in
       {
         networking.hostName = "nuc1";
         homelab.diskDevice = "/dev/disk/by-id/nvme-KINGSTON_SNVS500G_50026B7685AD8136";
-        # Pas "en*" : un adaptateur USB (cdc_ncm) serait aussi ponté.
+        # Not "en*": a USB adapter (cdc_ncm) would be bridged too.
         homelab.lanInterface = "eno1";
       }
     ];

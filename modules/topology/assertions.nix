@@ -8,7 +8,7 @@ in
     assertions = map (message: { assertion = false; inherit message; }) (clusterLib.validate cluster);
   };
 
-  # Test négatif : une IP dupliquée doit être rejetée.
+  # Negative test: a duplicate IP must be rejected.
   perSystem = { pkgs, ... }: {
     checks.topology-rejects-duplicate-ip =
       let
@@ -17,7 +17,7 @@ in
         errors = clusterLib.validate bad;
       in
       assert clusterLib.validate good == [ ];
-      assert lib.any (lib.hasPrefix "IP dupliquées") errors;
+      assert lib.any (lib.hasPrefix "duplicate IPs") errors;
       assert clusterLib.validate cluster == [ ];
       pkgs.runCommand "topology-rejects-duplicate-ip" { } ''
         echo ${lib.escapeShellArg (toString errors)} > $out

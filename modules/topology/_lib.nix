@@ -10,7 +10,7 @@ let
     in
     builtins.div (ipToInt ip) size == builtins.div base size;
 
-  # 02:00:00 : préfixe localement administré attendu par microvm.nix.
+  # 02:00:00: locally administered prefix expected by microvm.nix.
   macOf = name:
     let h = builtins.hashString "sha256" "homelab-nix:${name}";
     in "02:00:00:${lib.concatStringsSep ":" [ (lib.substring 0 2 h) (lib.substring 2 2 h) (lib.substring 4 2 h) ]}";
@@ -30,19 +30,19 @@ let
       net = cluster.network;
       staticReady = net.subnet != null && net.prefixLength != null && net.gateway != null;
     in
-    lib.optional (dupIps != [ ]) "IP dupliquées : ${toString dupIps}"
-    ++ lib.optional (dupMacs != [ ]) "MAC dérivées en collision : ${toString dupMacs}"
+    lib.optional (dupIps != [ ]) "duplicate IPs: ${toString dupIps}"
+    ++ lib.optional (dupMacs != [ ]) "derived MAC collision: ${toString dupMacs}"
     ++ lib.optional (allIps != [ ] && !staticReady)
-      "adresses statiques présentes mais cluster.network.{subnet,prefixLength,gateway} incomplet"
+      "static addresses present but cluster.network.{subnet,prefixLength,gateway} incomplete"
     ++ lib.optionals staticReady
-      (lib.concatMap (ip: lib.optional (!inSubnet net ip) "IP hors subnet : ${ip}") allIps)
-    ++ lib.optional (servers cluster == [ ]) "aucun nœud avec role = \"server\""
+      (lib.concatMap (ip: lib.optional (!inSubnet net ip) "IP outside the subnet: ${ip}") allIps)
+    ++ lib.optional (servers cluster == [ ]) "no node with role = \"server\""
     ++ lib.concatMap (name:
       let n = cluster.nodes.${name}; in
       lib.optional (lib.stringLength name > 12)
-        "nom de nœud > 12 caractères (tap ${tapOf name} > 15) : ${name}"
+        "node name longer than 12 characters (tap ${tapOf name} > 15): ${name}"
       ++ lib.optional (!cluster.hosts ? ${n.host})
-        "le nœud ${name} référence un host inconnu : ${n.host}"
+        "node ${name} refers to an unknown host: ${n.host}"
     ) nodeNames;
 
   nodesOn = cluster: hostName: lib.filterAttrs (_: n: n.host == hostName) cluster.nodes;
@@ -63,7 +63,7 @@ let
       DNS = cluster.network.dns;
       DHCP = "no";
     }
-    # Le host peut être lui-même la passerelle (uplink Wi-Fi) : pas de route vers soi.
+    # The host may itself be the gateway (Wi-Fi uplink): no route to itself.
     // lib.optionalAttrs (cluster.network.gateway != address) {
       Gateway = cluster.network.gateway;
     });

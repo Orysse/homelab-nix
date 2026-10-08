@@ -1,12 +1,12 @@
-# Niveau flake-parts : tous les hosts lisent la même topologie.
-# address = null : DHCP ; la machine reste joignable en mDNS (<nom>.local).
+# flake-parts level: every host reads the same topology.
+# address = null: DHCP; the machine stays reachable over mDNS (<name>.local).
 { lib, ... }:
 let
   inherit (lib) mkOption types;
   address = mkOption {
     type = types.nullOr types.str;
     default = null;
-    description = "IPv4 statique, ou null pour DHCP.";
+    description = "Static IPv4, or null for DHCP.";
   };
 in
 {
@@ -15,7 +15,7 @@ in
       subnet = mkOption {
         type = types.nullOr types.str;
         default = null;
-        description = "Adresse réseau IPv4, ex. 192.168.1.0";
+        description = "IPv4 network address, e.g. 192.168.1.0";
       };
       prefixLength = mkOption { type = types.nullOr (types.ints.between 1 32); default = null; };
       gateway = mkOption { type = types.nullOr types.str; default = null; };
@@ -25,53 +25,53 @@ in
     ingress = {
       address = mkOption {
         type = types.str;
-        description = "IP du LoadBalancer de Traefik (cible du futur NAT/PAT de la box).";
+        description = "Traefik's LoadBalancer IP (target of the router's port forwarding).";
       };
       pool = mkOption {
         type = types.str;
-        description = "Plage d'IP que MetalLB peut attribuer (doit contenir `address`), ex. 192.168.1.240-192.168.1.254.";
+        description = "IP range MetalLB may assign (must contain `address`), e.g. 192.168.1.240-192.168.1.254.";
       };
       domain = mkOption {
         type = types.str;
-        description = "Domaine des apps : <app>.<domain>.";
+        description = "Apps domain: <app>.<domain>.";
       };
     };
 
     name = mkOption {
       type = types.str;
-      description = "Nom du cluster (tags d'observabilité, clusterName Datadog).";
+      description = "Cluster name (observability tags, Datadog clusterName).";
     };
 
     datadog.site = mkOption {
       type = types.str;
-      description = "Site Datadog (région du compte), ex. datadoghq.com (US1), datadoghq.eu.";
+      description = "Datadog site (account region), e.g. datadoghq.com (US1), datadoghq.eu.";
     };
 
     vpn = {
       host = mkOption {
         type = types.str;
-        description = "Host physique qui porte le serveur WireGuard (cible du PAT UDP de la box).";
+        description = "Physical host running the WireGuard server (target of the router's UDP forwarding).";
       };
       port = mkOption { type = types.port; default = 51820; };
       endpoint = mkOption {
         type = types.str;
-        description = "Nom public du serveur, que les clients contactent (résout vers l'IP de la box).";
+        description = "Public name of the server that clients connect to (resolves to the router's IP).";
       };
       prefixLength = mkOption { type = types.ints.between 8 30; default = 24; };
       serverAddress = mkOption {
         type = types.str;
-        description = "IP du serveur dans le tunnel, ex. 10.100.0.1.";
+        description = "Server IP inside the tunnel, e.g. 10.250.0.1.";
       };
       serverPublicKey = mkOption {
         type = types.str;
-        description = "Clé publique du serveur (la privée est un secret sops du host).";
+        description = "Server public key (the private key is a sops secret of the host).";
       };
       routes = mkOption {
         type = types.listOf types.str;
-        description = "Réseaux du homelab joignables par le tunnel (AllowedIPs des clients).";
+        description = "Homelab networks reachable through the tunnel (clients' AllowedIPs).";
       };
       peers = mkOption {
-        description = "Clients autorisés : IP dans le tunnel et clé publique.";
+        description = "Allowed clients: tunnel IP and public key.";
         type = types.attrsOf (types.submodule {
           options = {
             address = mkOption { type = types.str; };
@@ -84,13 +84,13 @@ in
     gitops = {
       url = mkOption {
         type = types.str;
-        description = "URL git (HTTPS, repo public) du repo homelab-cluster.";
+        description = "Git URL (HTTPS, public repository) of homelab-cluster.";
       };
       branch = mkOption { type = types.str; default = "main"; };
       path = mkOption {
         type = types.str;
         default = "./clusters/homelab";
-        description = "Dossier du repo que Flux applique (point d'entrée du cluster).";
+        description = "Repository directory applied by Flux (cluster entry point).";
       };
     };
 
@@ -107,17 +107,17 @@ in
           host = mkOption { type = types.str; };
           role = mkOption {
             type = types.enum [ "server" "agent" ];
-            description = "Sélectionne le rôle k3s.";
+            description = "Selects the k3s role.";
           };
           mem = mkOption {
             type = types.ints.positive;
-            description = "RAM en Mo (réservée sur le host).";
+            description = "RAM in MB (reserved on the host).";
           };
           vcpu = mkOption { type = types.ints.positive; };
           dataDisk = mkOption {
             type = types.ints.positive;
             default = 20480;
-            description = "Taille (Mio) du volume de données k3s (/var/lib/rancher), fichier creux sur le host.";
+            description = "Size (MiB) of the k3s data volume (/var/lib/rancher), a sparse file on the host.";
           };
         };
       });

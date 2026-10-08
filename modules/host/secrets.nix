@@ -1,4 +1,4 @@
-# Le host déchiffre avec sa clé SSH d'hôte (destinataire dans .sops.yaml).
+# The host decrypts with its SSH host key (a recipient in .sops.yaml).
 { inputs, ... }:
 {
   flake.modules.nixos.secrets = { config, ... }: {

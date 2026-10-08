@@ -1,5 +1,5 @@
-# Token généré sur le host, hors repo. Nœud déplacé sur un autre host : y copier
-# /var/lib/homelab/k3s-token. Cible : sops-nix (D10).
+# Token generated on the host, outside the repository. When a node moves to another host,
+# copy /var/lib/homelab/k3s-token there. Target: sops-nix (D10).
 { config, ... }:
 let
   inherit (config) cluster;
@@ -13,7 +13,7 @@ in
     in
     {
       systemd.services.homelab-k3s-token = {
-        description = "Génère et distribue le token k3s aux microVMs";
+        description = "Generate the k3s token and distribute it to the microVMs";
         wantedBy = [ "microvms.target" ];
         before = map (n: "microvm@${n}.service") nodes;
         requiredBy = map (n: "microvm@${n}.service") nodes;
@@ -35,8 +35,8 @@ in
         '';
       };
 
-      # Images de volume sans copy-on-write btrfs (fragmentation) ; +C ne vaut que
-      # pour les fichiers créés ensuite.
+      # Volume images without btrfs copy-on-write (fragmentation); +C only applies to
+      # files created afterwards.
       systemd.tmpfiles.settings."20-microvm-nocow" = lib.genAttrs
         (map (n: "/var/lib/microvms/${n}") nodes)
         (_: { h.argument = "+C"; });

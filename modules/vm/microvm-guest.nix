@@ -1,4 +1,4 @@
-# `node` (specialArgs) : nom du nœud dans la topologie.
+# `node` (specialArgs): the node's name in the topology.
 { config, ... }:
 let
   inherit (config) cluster;
@@ -50,9 +50,9 @@ in
       networking.useDHCP = false;
       systemd.network.enable = true;
       systemd.network.networks."20-lan" = {
-        # Pas Type = "ether" : les veth des pods matcheraient et recevraient l'IP du nœud.
+        # Not Type = "ether": the pods' veths would match and get the node's IP.
         matchConfig.MACAddress = clusterLib.macOf node;
-        # Sinon k3s prend l'IPv6 SLAAC de la box (préfixe opérateur, non stable) comme IP de nœud.
+        # Otherwise k3s picks the router's SLAAC IPv6 (unstable ISP prefix) as the node IP.
         networkConfig = clusterLib.lanNetworkConfig cluster spec.address // {
           IPv6AcceptRA = false;
         };

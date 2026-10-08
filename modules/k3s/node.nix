@@ -1,6 +1,6 @@
-# Root de la VM en tmpfs ; seul /var/lib/rancher (et /etc/rancher, redirigé dedans)
-# survit, sur un disque : l'overlayfs de containerd ne fonctionne pas sur virtiofs.
-# Seul le server bootstrap applique k3s-bootstrap : k3s ne synchronise pas ses manifests.
+# VM root on tmpfs; only /var/lib/rancher (and /etc/rancher, redirected into it) survives,
+# on a disk: containerd's overlayfs does not work on virtiofs.
+# Only the bootstrap server applies k3s-bootstrap: k3s does not sync its manifests.
 { config, ... }:
 let
   inherit (config) cluster;
@@ -40,7 +40,7 @@ in
         disable = lib.optionals isServer [ "servicelb" ];
         serverAddr = lib.optionalString (!isBootstrap)
           "https://${clusterLib.endpointOf bootstrap cluster.nodes.${bootstrap}}:6443";
-        # Le stub 127.0.0.53 est injoignable depuis les pods (kubelet retomberait sur 8.8.8.8).
+        # The 127.0.0.53 stub is unreachable from pods (kubelet would fall back to 8.8.8.8).
         extraFlags = [ "--resolv-conf=/run/systemd/resolve/resolv.conf" ]
           ++ lib.optionals isServer (
           [ "--tls-san=${node}.local" "--write-kubeconfig-mode=0600" ]
@@ -55,9 +55,9 @@ in
 
       # https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
       networking.firewall = {
-        allowedTCPPorts = [ 10250 80 443 7946 ] # 7946 : memberlist MetalLB
+        allowedTCPPorts = [ 10250 80 443 7946 ] # 7946: MetalLB memberlist
           ++ lib.optionals isServer [ 6443 2379 2380 ];
-        allowedUDPPorts = [ 8472 7946 ]; # flannel vxlan, memberlist MetalLB
+        allowedUDPPorts = [ 8472 7946 ]; # flannel vxlan, MetalLB memberlist
         trustedInterfaces = [ "cni0" "flannel.1" ];
       };
     };

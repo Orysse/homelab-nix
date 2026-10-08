@@ -1,9 +1,9 @@
-# Clé age de Flux dérivée de la clé SSH d'hôte du server bootstrap (dans /persist) :
-# rien à générer ni à sauvegarder. Nouvelle identité => sops updatekeys côté homelab-cluster.
+# Flux's age key is derived from the bootstrap server's SSH host key (in /persist):
+# nothing to generate or back up. New identity => sops updatekeys in homelab-cluster.
 {
   flake.modules.nixos.k3s-bootstrap = { config, pkgs, ... }: {
     systemd.services.flux-sops-age = {
-      description = "Publie la clé age du nœud dans flux-system/sops-age";
+      description = "Publish the node's age key to flux-system/sops-age";
       wantedBy = [ "multi-user.target" ];
       after = [ "k3s.service" ];
       requires = [ "k3s.service" ];

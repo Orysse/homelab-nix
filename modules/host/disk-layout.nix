@@ -1,5 +1,5 @@
-# Un pool btrfs plutôt que des partitions : pas de taille à figer. Sous-volumes séparés
-# pour restaurer @root sans toucher au store, aux logs ni à l'état des VMs.
+# One btrfs pool rather than partitions: no size to fix upfront. Separate subvolumes so
+# @root can be restored without touching the store, the logs or the VMs' state.
 { inputs, ... }:
 {
   flake.modules.nixos.disk-layout = { config, lib, ... }: {
@@ -7,7 +7,7 @@
 
     options.homelab.diskDevice = lib.mkOption {
       type = lib.types.str;
-      description = "Disque système (de préférence /dev/disk/by-id/…).";
+      description = "System disk (preferably /dev/disk/by-id/…).";
     };
 
     config.disko.devices.disk.main = {

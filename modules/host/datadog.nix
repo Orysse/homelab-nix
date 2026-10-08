@@ -1,12 +1,12 @@
-# L'agent du cluster est déployé par Flux ; même site et même tag cluster pour corréler.
+# The cluster agent is deployed by Flux; same site and cluster tag so both correlate.
 { config, ... }:
 let
   inherit (config) cluster;
 in
 {
   flake.modules.nixos.datadog = { config, ... }: {
-    # CONTOURNEMENT nixpkgs-unstable (2026-10) : pythonMetadataCheck cherche « checks-base »
-    # au lieu de « datadog-checks-base ». À retirer quand nixpkgs#datadog-agent rebuild.
+    # WORKAROUND nixpkgs-unstable (2026-10): pythonMetadataCheck looks for "checks-base"
+    # instead of "datadog-checks-base". Remove once nixpkgs#datadog-agent builds again.
     nixpkgs.overlays = [
       (final: prev: {
         datadog-integrations-core = extras:
