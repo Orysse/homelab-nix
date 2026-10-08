@@ -29,6 +29,21 @@ in
 
     networking.firewall.allowedUDPPorts = [ vpn.port ];
 
+    # Clients only reach the homelab (vpn.routes), not the rest of the LAN: the routes
+    # pushed to clients are only a client-side setting.
+    networking.firewall.extraCommands = ''
+      iptables -D FORWARD -i wg0 -j homelab-vpn-fwd 2>/dev/null || true
+      iptables -F homelab-vpn-fwd 2>/dev/null || iptables -N homelab-vpn-fwd
+      ${lib.concatMapStrings (net: "iptables -A homelab-vpn-fwd -d ${net} -j RETURN\n") vpn.routes}
+      iptables -A homelab-vpn-fwd -j REJECT --reject-with icmp-admin-prohibited
+      iptables -I FORWARD -i wg0 -j homelab-vpn-fwd
+    '';
+    networking.firewall.extraStopCommands = ''
+      iptables -D FORWARD -i wg0 -j homelab-vpn-fwd 2>/dev/null || true
+      iptables -F homelab-vpn-fwd 2>/dev/null || true
+      iptables -X homelab-vpn-fwd 2>/dev/null || true
+    '';
+
     networking.nat = {
       enable = true;
       internalInterfaces = [ "wg0" ];

@@ -43,7 +43,7 @@ in
         # The 127.0.0.53 stub is unreachable from pods (kubelet would fall back to 8.8.8.8).
         extraFlags = [ "--resolv-conf=/run/systemd/resolve/resolv.conf" ]
           ++ lib.optionals isServer (
-          [ "--tls-san=${node}.local" "--write-kubeconfig-mode=0600" ]
+          [ "--tls-san=${node}.local" "--write-kubeconfig-mode=0600" "--secrets-encryption" ]
           ++ lib.optional (spec.address != null) "--tls-san=${spec.address}"
         );
       };
