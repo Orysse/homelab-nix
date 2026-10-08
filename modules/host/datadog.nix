@@ -1,10 +1,15 @@
 # The cluster agent is deployed by Flux; same site and cluster tag so both correlate.
-{ config, ... }:
+{ config, lib, ... }:
 let
   inherit (config) cluster;
 in
 {
-  flake.modules.nixos.datadog = { config, ... }: {
+  flake.modules.nixos.datadog = { config, ... }:
+    let
+      host = config.networking.hostName;
+      vms = lib.attrNames (lib.filterAttrs (_: node: node.host == host) cluster.nodes);
+    in
+    {
     systemd.tmpfiles.rules = [
       "d /var/lib/datadog-agent/run 0750 datadog datadog -"
       "d /run/datadog 0755 datadog datadog -"
@@ -26,6 +31,7 @@ in
     ];
 
     sops.secrets.datadog-api-key.owner = "datadog";
+    users.users.datadog.extraGroups = [ "systemd-journal" ];   # read the journal
 
     services.datadog-agent = {
       enable = true;
@@ -38,6 +44,24 @@ in
       extraConfig = {
         run_path = "/var/lib/datadog-agent/run";
         dogstatsd_socket = "/run/datadog/dsd.socket";
+        logs_enabled = true;
+        logs_config.run_path = "/var/lib/datadog-agent/run";
+      };
+      checks = {
+        # Go core check: state of the units that make this host useful. A stopped VM shows
+        # here as a failed unit, not only as a missing host.
+        systemd = {
+          init_config = { };
+          instances = [{
+            unit_names =
+              map (vm: "microvm@${vm}.service") vms
+              ++ map (vm: "microvm-virtiofsd@${vm}.service") vms
+              ++ [ "sshd.service" "systemd-networkd.service" ]
+              ++ lib.optional config.services.ddclient.enable "ddclient.timer";
+          }];
+        };
+        # Host logs (sshd, networkd, VM units, nixos-rebuild activations).
+        journald.logs = [{ type = "journald"; source = "journald"; }];
       };
       # The module's default sets use_mount = "false" (a string): the Go disk check rejects
       # it and the agent logs an error before falling back to the Python check.
