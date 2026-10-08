@@ -23,11 +23,11 @@ base hands it the network parameters through the `cluster-vars` ConfigMap (see
    └── 192.168.1.240                HTTP(S) entry point: MetalLB -> Traefik
 ```
 
-| Layer | Tool | Where |
-|---|---|---|
-| Machines: host, VMs, k3s | Nix (`nixos-rebuild`) | this repository |
-| Cluster content: platform, apps | Flux (git push) | `homelab-cluster` |
-| Application code (e.g. the site) | CI -> image | each app's repository |
+| Layer                            | Tool                  | Where                 |
+| -------------------------------- | --------------------- | --------------------- |
+| Machines: host, VMs, k3s         | Nix (`nixos-rebuild`) | this repository       |
+| Cluster content: platform, apps  | Flux (git push)       | `homelab-cluster`     |
+| Application code (e.g. the site) | CI -> image           | each app's repository |
 
 ## Layout
 

@@ -45,7 +45,7 @@ in
         init_config = { };
         instances = [{
           use_mount = false;
-          file_system_global_exclude = [ "tmpfs" "devtmpfs" "ramfs" "overlay" "efivarfs" ];
+          file_system_exclude = [ "tmpfs" "devtmpfs" "ramfs" "overlay" "efivarfs" ];
         }];
       };
     };
