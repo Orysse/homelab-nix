@@ -27,6 +27,20 @@
       domain = "abe.lc";
     };
 
+    # VPN d'administration. PAT de la box : UDP 51820 -> nuc1 (.200).
+    # routes : seulement .192-.255 (hosts, nœuds, entrée), pas tout le /24 : beaucoup de
+    # réseaux (box, cafés) sont aussi en 192.168.1.0/24 et seraient masqués.
+    vpn = {
+      host = "nuc1";
+      endpoint = "vpn.abe.lc";
+      serverAddress = "10.100.0.1";
+      serverPublicKey = "TNugHNt2qsBT5T/3ac1HWzXFzrw24rWu1l0uCKZhWEM=";
+      routes = [ "192.168.1.192/26" ];
+      peers = {
+        thinkpad = { address = "10.100.0.2"; publicKey = "Gc7BSQE6PfLylPg2Zam2r3a9aaANhhc0nY07bPNQWS4="; };
+      };
+    };
+
     # Contenu du cluster (plateforme, apps) : repo suivi par Flux. HTTPS : lu sans
     # identifiants (repo public).
     gitops.url = "https://github.com/Orysse/homelab-cluster";

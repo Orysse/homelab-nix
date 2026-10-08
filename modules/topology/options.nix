@@ -52,6 +52,41 @@ in
       description = "Site Datadog (région du compte), ex. datadoghq.com (US1), datadoghq.eu.";
     };
 
+    # VPN d'administration (WireGuard) : serveur sur un host physique, indépendant de k3s.
+    vpn = {
+      host = mkOption {
+        type = types.str;
+        description = "Host physique qui porte le serveur WireGuard (cible du PAT UDP de la box).";
+      };
+      port = mkOption { type = types.port; default = 51820; };
+      endpoint = mkOption {
+        type = types.str;
+        description = "Nom public du serveur, que les clients contactent (résout vers l'IP de la box).";
+      };
+      prefixLength = mkOption { type = types.ints.between 8 30; default = 24; };
+      serverAddress = mkOption {
+        type = types.str;
+        description = "IP du serveur dans le tunnel, ex. 10.100.0.1.";
+      };
+      serverPublicKey = mkOption {
+        type = types.str;
+        description = "Clé publique du serveur (la privée est un secret sops du host).";
+      };
+      routes = mkOption {
+        type = types.listOf types.str;
+        description = "Réseaux du homelab joignables par le tunnel (AllowedIPs des clients).";
+      };
+      peers = mkOption {
+        description = "Clients autorisés : IP dans le tunnel et clé publique.";
+        type = types.attrsOf (types.submodule {
+          options = {
+            address = mkOption { type = types.str; };
+            publicKey = mkOption { type = types.str; };
+          };
+        });
+      };
+    };
+
     # Repo GitOps suivi par Flux (contenu du cluster : plateforme et apps).
     gitops = {
       url = mkOption {

@@ -17,6 +17,7 @@ in
       m.secrets
       m.ddns        # secret : cloudflare-ddns-token
       m.datadog     # secret : datadog-api-key
+      m.wireguard   # secret : wireguard-private-key
       {
         networking.hostName = "nuc1";
         homelab.diskDevice = "/dev/disk/by-id/nvme-KINGSTON_SNVS500G_50026B7685AD8136";
