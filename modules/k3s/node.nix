@@ -43,7 +43,13 @@ in
         # The 127.0.0.53 stub is unreachable from pods (kubelet would fall back to 8.8.8.8).
         extraFlags = [ "--resolv-conf=/run/systemd/resolve/resolv.conf" ]
           ++ lib.optionals isServer (
-          [ "--tls-san=${node}.local" "--write-kubeconfig-mode=0600" "--secrets-encryption" ]
+          [
+            "--tls-san=${node}.local"
+            "--write-kubeconfig-mode=0600"
+            "--secrets-encryption"
+            # Pod traffic between nodes encrypted and authenticated (VXLAN is neither).
+            "--flannel-backend=wireguard-native"
+          ]
           ++ lib.optional (spec.address != null) "--tls-san=${spec.address}"
         );
       };
@@ -54,11 +60,21 @@ in
       };
 
       # https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
-      networking.firewall = {
-        allowedTCPPorts = [ 10250 80 443 7946 ] # 7946: MetalLB memberlist
-          ++ lib.optionals isServer [ 6443 2379 2380 ];
-        allowedUDPPorts = [ 8472 7946 ]; # flannel vxlan, MetalLB memberlist
-        trustedInterfaces = [ "cni0" "flannel.1" ];
-      };
+      # Open to the LAN: SSH, the API (kubectl from the LAN and the VPN), Traefik.
+      # Nodes only: etcd, kubelet, MetalLB memberlist (7946), flannel WireGuard (51820).
+      networking.firewall =
+        let
+          nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
+          fromNodes = proto: port: lib.concatMapStrings
+            (ip: "iptables -A nixos-fw -p ${proto} -s ${ip} --dport ${port} -j nixos-fw-accept\n")
+            nodeIPs;
+        in
+        {
+          allowedTCPPorts = [ 80 443 ] ++ lib.optionals isServer [ 6443 ];
+          extraCommands = fromNodes "tcp" "10250" + fromNodes "tcp" "7946" + fromNodes "udp" "7946"
+            + fromNodes "udp" "51820"
+            + lib.optionalString isServer (fromNodes "tcp" "2379:2380");
+          trustedInterfaces = [ "cni0" "flannel-wg" ];
+        };
     };
 }
