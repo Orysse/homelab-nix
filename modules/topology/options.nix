@@ -1,8 +1,5 @@
-# Schéma de la topologie. Déclaré au niveau flake-parts pour que tous les hosts
-# lisent la même donnée (seule source de vérité : topology.nix).
-#
-# `address = null` (défaut) => la machine prend son IP en DHCP. Les noms restent
-# résolvables en mDNS (<nom>.local), ce qui suffit à k3s pour trouver le server.
+# Niveau flake-parts : tous les hosts lisent la même topologie.
+# address = null : DHCP ; la machine reste joignable en mDNS (<nom>.local).
 { lib, ... }:
 let
   inherit (lib) mkOption types;
@@ -14,7 +11,6 @@ let
 in
 {
   options.cluster = {
-    # Utilisé seulement par les machines à adresse statique.
     network = {
       subnet = mkOption {
         type = types.nullOr types.str;
@@ -26,7 +22,6 @@ in
       dns = mkOption { type = types.listOf types.str; default = [ ]; };
     };
 
-    # Point d'entrée HTTP(S) du cluster : une IP annoncée par MetalLB, portée par Traefik.
     ingress = {
       address = mkOption {
         type = types.str;
@@ -52,7 +47,6 @@ in
       description = "Site Datadog (région du compte), ex. datadoghq.com (US1), datadoghq.eu.";
     };
 
-    # VPN d'administration (WireGuard) : serveur sur un host physique, indépendant de k3s.
     vpn = {
       host = mkOption {
         type = types.str;
@@ -87,7 +81,6 @@ in
       };
     };
 
-    # Repo GitOps suivi par Flux (contenu du cluster : plateforme et apps).
     gitops = {
       url = mkOption {
         type = types.str;

@@ -1,7 +1,4 @@
-# Secrets du socle (sops-nix). Chaque secret est chiffré pour l'admin ET pour la machine
-# qui le consomme (sa clé SSH d'hôte convertie en age : `ssh-to-age < ssh_host_ed25519_key.pub`).
-# Clés admin : les mêmes que nix-secrets — clé age logicielle (~/.config/sops/age/keys.txt,
-# elle-même chiffrée pour la YubiKey dans nix-secrets/secrets/user-age-key.yaml) + YubiKey.
+# Machines : clé SSH d'hôte convertie en age (ssh-to-age < ssh_host_ed25519_key.pub).
 keys:
   - &abel_age age1uzjc82ya0szkyht2txxjsk03csk7cpap524lz9v8gjxsaqxlaejsr3tkcc
   - &abel_yubikey age1yubikey1q23p5ysmjm8ukvad9xefunvaq7fz06zsf72jr0vj20z2j48sjjh2jm256cs

@@ -1,10 +1,5 @@
-# homelab.k3s.manifests.<nom> = [ objets Kubernetes ]  ->  <nom>.json dans le dossier
-# de manifests de k3s.
-#
-# Pourquoi pas directement services.k3s.manifests.<nom>.content : le module k3s les
-# écrit en YAML, et son générateur replie les longues chaînes en coupant au milieu
-# d'échappements (« \\ » devenait « \ \ » dans le contenu d'une ConfigMap). En JSON,
-# rien n'est replié : ce qui est déclaré est exactement ce qui est appliqué.
+# En JSON plutôt que via services.k3s.manifests.<x>.content : le générateur YAML de
+# nixpkgs replie les longues chaînes au milieu d'un échappement (« \\ » -> « \ \ »).
 {
   flake.modules.nixos.k3s-bootstrap = { config, lib, pkgs, ... }: {
     options.homelab.k3s.manifests = lib.mkOption {
@@ -20,11 +15,9 @@
           (builtins.toJSON { apiVersion = "v1"; kind = "List"; items = objects; });
       }) config.homelab.k3s.manifests;
 
-      # Le dossier de manifests est sur le volume persistant et NixOS n'y retire jamais
-      # un lien qu'il ne déclare plus. Avant chaque démarrage de k3s, on supprime les
-      # liens vers /nix/store non déclarés : le dossier reflète exactement le flake.
-      # (Les fichiers propres à k3s - coredns.yaml, traefik.yaml… - ne sont pas des liens.)
-      # Supprimer un manifest ne supprime pas ses ressources du cluster (comportement k3s).
+      # Le dossier est sur le volume persistant et tmpfiles ne retire jamais un lien non
+      # déclaré : un ancien <x>.yaml masquerait le nouveau <x>.json (même nom d'addon).
+      # Les fichiers de k3s lui-même ne sont pas des liens et restent intacts.
       systemd.services.k3s-prune-manifests =
         let
           cfg = config.services.k3s;

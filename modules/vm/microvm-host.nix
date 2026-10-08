@@ -1,4 +1,3 @@
-# Génère microvm.vms à partir des nœuds de la topologie dont host == ce host.
 { config, inputs, ... }:
 let
   inherit (config) cluster;

@@ -1,7 +1,5 @@
-# Brique host : token k3s partagé, généré une fois sur le host (hors repo) et copié
-# dans le /persist de chaque VM de ce host avant son démarrage.
-# Si un nœud change de host, copier /var/lib/homelab/k3s-token sur le nouveau host.
-# Cible : sops-nix (D10).
+# Token généré sur le host, hors repo. Nœud déplacé sur un autre host : y copier
+# /var/lib/homelab/k3s-token. Cible : sops-nix (D10).
 { config, ... }:
 let
   inherit (config) cluster;
@@ -37,8 +35,8 @@ in
         '';
       };
 
-      # Les images de volume ne doivent pas être en copy-on-write sur btrfs
-      # (fragmentation). +C ne s'applique qu'aux fichiers créés ensuite.
+      # Images de volume sans copy-on-write btrfs (fragmentation) ; +C ne vaut que
+      # pour les fichiers créés ensuite.
       systemd.tmpfiles.settings."20-microvm-nocow" = lib.genAttrs
         (map (n: "/var/lib/microvms/${n}") nodes)
         (_: { h.argument = "+C"; });

@@ -1,7 +1,4 @@
-# Secrets du host (sops-nix). Fichier chiffré : secrets/<host>.yaml, destinataires dans
-# .sops.yaml (l'admin + la clé SSH d'hôte de la machine, convertie en age).
-# Le host déchiffre avec sa propre clé SSH d'hôte : aucune clé privée à déposer à la main.
-# Les briques qui consomment un secret déclarent sops.secrets.<nom> elles-mêmes.
+# Le host déchiffre avec sa clé SSH d'hôte (destinataire dans .sops.yaml).
 { inputs, ... }:
 {
   flake.modules.nixos.secrets = { config, ... }: {

@@ -1,8 +1,5 @@
-# Serveur WireGuard d'administration (wg0), sur le host désigné par cluster.vpn.host.
-# Indépendant de k3s : l'accès d'admin marche même si le cluster est en panne.
-# Clé privée : secret sops wireguard-private-key. Clients : cluster.vpn.peers (topologie).
-# Le trafic sortant du tunnel vers le LAN est NATé avec l'IP du host : les machines du
-# homelab lui répondent sans route de retour à configurer.
+# Sur le host et non dans k3s : l'accès d'admin doit survivre à une panne du cluster.
+# NAT vers br0 : le LAN répond au host, pas de route de retour à configurer.
 { config, ... }:
 let
   inherit (config) cluster;
@@ -11,7 +8,7 @@ in
 {
   flake.modules.nixos.wireguard = { config, lib, pkgs, ... }: {
     sops.secrets.wireguard-private-key.owner = "systemd-network";
-    environment.systemPackages = [ pkgs.wireguard-tools ]; # `wg show` pour diagnostiquer
+    environment.systemPackages = [ pkgs.wireguard-tools ];
 
     systemd.network.netdevs."50-wg0" = {
       netdevConfig = { Kind = "wireguard"; Name = "wg0"; };

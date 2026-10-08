@@ -1,5 +1,5 @@
-# Généré sur le NUC10i7FNH par `nixos-generate-config --show-hardware-config --no-filesystems`.
-# Hors de modules/ car ce n'est pas un module flake-parts. Les filesystems viennent de disko.
+# nixos-generate-config --show-hardware-config --no-filesystems (filesystems : disko).
+# Hors de modules/ : ce n'est pas un module flake-parts.
 { config, lib, pkgs, modulesPath, ... }:
 
 {

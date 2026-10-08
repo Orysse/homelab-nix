@@ -1,4 +1,3 @@
-# br0 porte l'IP du host ; la NIC filaire et les taps vm-* y sont esclaves.
 { config, ... }:
 let
   inherit (config) cluster;
@@ -29,7 +28,6 @@ in
         networkConfig.Bridge = "br0";
       };
 
-      # Statique ou DHCP selon la topologie ; mDNS dans les deux cas (<host>.local).
       systemd.network.networks."10-br0" = {
         matchConfig.Name = "br0";
         networkConfig = clusterLib.lanNetworkConfig cluster
@@ -39,8 +37,8 @@ in
 
       services.resolved.settings.Resolve.MulticastDNS = "yes";
 
-      # Le firewall du host ne filtre que ce qui lui est destiné ; le trafic ponté
-      # vers les VMs n'y passe pas (pas de br_netfilter). Ouverts : SSH (users-ssh), mDNS.
+      # Ne filtre que le trafic destiné au host : le trafic ponté vers les VMs ne
+      # traverse pas netfilter (pas de br_netfilter).
       networking.firewall.enable = true;
       networking.firewall.allowedUDPPorts = [ 5353 ];
     };

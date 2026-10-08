@@ -1,4 +1,3 @@
-# Accès root par clé uniquement. Partagé entre host et VMs.
 {
   flake.modules.nixos.users-ssh = {
     users.users.root.openssh.authorizedKeys.keys = [

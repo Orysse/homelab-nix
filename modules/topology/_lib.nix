@@ -1,4 +1,3 @@
-# Fonctions pures sur la topologie (préfixe `_` : ignoré par import-tree).
 { lib }:
 let
   ipToInt = ip:
@@ -11,7 +10,7 @@ let
     in
     builtins.div (ipToInt ip) size == builtins.div base size;
 
-  # MAC localement administrée 02:00:00:xx:xx:xx, dérivée du nom du nœud.
+  # 02:00:00 : préfixe localement administré attendu par microvm.nix.
   macOf = name:
     let h = builtins.hashString "sha256" "homelab-nix:${name}";
     in "02:00:00:${lib.concatStringsSep ":" [ (lib.substring 0 2 h) (lib.substring 2 2 h) (lib.substring 4 2 h) ]}";
@@ -20,7 +19,6 @@ let
 
   duplicates = xs: lib.unique (lib.filter (x: lib.count (y: y == x) xs > 1) xs);
 
-  # Renvoie la liste des erreurs ; vide = topologie valide.
   validate = cluster:
     let
       nodeNames = lib.attrNames cluster.nodes;
@@ -52,13 +50,10 @@ let
   servers = cluster: lib.sort lib.lessThan
     (lib.attrNames (lib.filterAttrs (_: n: n.role == "server") cluster.nodes));
 
-  # Le server qui initialise le datastore (clusterInit) ; les autres le rejoignent.
   bootstrapServer = cluster: lib.head (servers cluster);
 
-  # Comment joindre une machine : son IP statique, sinon son nom mDNS.
   endpointOf = name: machine: if machine.address != null then machine.address else "${name}.local";
 
-  # networkConfig systemd-networkd de l'interface LAN d'une machine (host ou VM).
   lanNetworkConfig = cluster: address:
     { MulticastDNS = true; }
     // (if address == null then {
@@ -68,7 +63,7 @@ let
       DNS = cluster.network.dns;
       DHCP = "no";
     }
-    # Pas de route par défaut vers soi-même (cas où le host est la passerelle).
+    # Le host peut être lui-même la passerelle (uplink Wi-Fi) : pas de route vers soi.
     // lib.optionalAttrs (cluster.network.gateway != address) {
       Gateway = cluster.network.gateway;
     });

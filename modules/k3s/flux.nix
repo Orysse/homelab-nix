@@ -1,9 +1,5 @@
-# Bootstrap GitOps : installe Flux et le fait suivre le repo homelab-cluster.
-# C'est la frontière du socle : tout ce qui tourne DANS le cluster (MetalLB, Traefik,
-# apps) est dans homelab-cluster et appliqué par Flux, pas par nixos-rebuild.
-#
-# Le pont entre les deux : la ConfigMap flux-system/cluster-vars, écrite ici depuis la
-# topologie, que Flux substitue dans les manifests (${DOMAIN}, ${INGRESS_ADDRESS}…).
+# Frontière du socle : le contenu du cluster vit dans homelab-cluster (Flux).
+# cluster-vars expose la topologie aux manifests (${DOMAIN}, ${INGRESS_ADDRESS}…).
 { config, ... }:
 let
   inherit (config) cluster;
@@ -17,7 +13,6 @@ in
       hash = "sha256-uviFPpOhBkaZa3mePVmvY+m+HaupXV3PZh8yHNX/ppI=";
       targetNamespace = "flux-system";
       createNamespace = true;
-      # Pas de mise à jour automatique d'images pour l'instant : on fige les tags dans git.
       values = {
         imageAutomationController.create = false;
         imageReflectionController.create = false;

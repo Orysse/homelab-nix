@@ -15,13 +15,13 @@ in
       m.microvm-host
       m.k3s-token
       m.secrets
-      m.ddns        # secret : cloudflare-ddns-token
-      m.datadog     # secret : datadog-api-key
-      m.wireguard   # secret : wireguard-private-key
+      m.ddns
+      m.datadog
+      m.wireguard
       {
         networking.hostName = "nuc1";
         homelab.diskDevice = "/dev/disk/by-id/nvme-KINGSTON_SNVS500G_50026B7685AD8136";
-        # e1000e intégrée. Pas "en*" : un adaptateur USB (cdc_ncm) serait aussi ponté.
+        # Pas "en*" : un adaptateur USB (cdc_ncm) serait aussi ponté.
         homelab.lanInterface = "eno1";
       }
     ];

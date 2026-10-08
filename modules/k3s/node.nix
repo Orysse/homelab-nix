@@ -1,14 +1,6 @@
-# Brique invité : fait d'un nœud de la topologie un nœud k3s. Le `role` choisit
-# server/agent ; le premier server (ordre alphabétique) initialise le datastore etcd.
-#
-# État : le root de la VM reste un tmpfs. Seul l'état k3s survit, sur un volume de
-# données par VM (/var/lib/rancher). /etc/rancher (mot de passe du nœud, kubeconfig)
-# y est redirigé. Ce volume est un disque et non un partage virtiofs, car l'overlayfs
-# de containerd ne fonctionne pas sur virtiofs.
-#
-# Le server bootstrap reçoit en plus la brique `k3s-bootstrap` (flux.nix, manifests.nix) :
-# installation de Flux et ConfigMap cluster-vars. Un seul server l'applique, car k3s ne
-# synchronise pas ses manifests entre servers.
+# Root de la VM en tmpfs ; seul /var/lib/rancher (et /etc/rancher, redirigé dedans)
+# survit, sur un disque : l'overlayfs de containerd ne fonctionne pas sur virtiofs.
+# Seul le server bootstrap applique k3s-bootstrap : k3s ne synchronise pas ses manifests.
 { config, ... }:
 let
   inherit (config) cluster;
@@ -41,19 +33,14 @@ in
       services.k3s = {
         enable = true;
         role = spec.role;
-        # Écrit par la brique host k3s-token, partagé via /persist. Jamais dans le repo.
         tokenFile = "/persist/k3s-token";
         nodeName = node;
-        # null (DHCP) : k3s prend l'IP de l'interface de la route par défaut.
         nodeIP = spec.address;
         clusterInit = isServer && isBootstrap;
-        # LoadBalancer fourni par MetalLB (platform/metallb.nix), pas par servicelb.
         disable = lib.optionals isServer [ "servicelb" ];
-        # IP statique du server si connue, sinon <server>.local (mDNS).
         serverAddr = lib.optionalString (!isBootstrap)
           "https://${clusterLib.endpointOf bootstrap cluster.nodes.${bootstrap}}:6443";
-        # resolv.conf "réel" de resolved (le stub 127.0.0.53 est inutilisable dans
-        # les pods ; sans ça kubelet retombe sur 8.8.8.8).
+        # Le stub 127.0.0.53 est injoignable depuis les pods (kubelet retomberait sur 8.8.8.8).
         extraFlags = [ "--resolv-conf=/run/systemd/resolve/resolv.conf" ]
           ++ lib.optionals isServer (
           [ "--tls-san=${node}.local" "--write-kubeconfig-mode=0600" ]
@@ -66,7 +53,7 @@ in
         after = [ "systemd-tmpfiles-setup.service" ];
       };
 
-      # Ports : https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
+      # https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
       networking.firewall = {
         allowedTCPPorts = [ 10250 80 443 7946 ] # 7946 : memberlist MetalLB
           ++ lib.optionals isServer [ 6443 2379 2380 ];

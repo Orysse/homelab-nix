@@ -1,16 +1,12 @@
-# Agent Datadog sur le host physique : CPU, RAM, disques, réseau, processus (dont les
-# QEMU des microVMs). Le cluster a son propre agent, déployé par Flux (homelab-cluster).
-# Même site et même tag de cluster que lui (topologie), pour corréler host et cluster.
-# Clé d'API : secret sops datadog-api-key.
+# L'agent du cluster est déployé par Flux ; même site et même tag cluster pour corréler.
 { config, ... }:
 let
   inherit (config) cluster;
 in
 {
   flake.modules.nixos.datadog = { config, ... }: {
-    # CONTOURNEMENT nixpkgs-unstable (2026-10) : le contrôle de métadonnées Python cherche
-    # « checks-base » au lieu de « datadog-checks-base » et casse le build des intégrations.
-    # À retirer quand `nix build nixpkgs#datadog-agent` repasse.
+    # CONTOURNEMENT nixpkgs-unstable (2026-10) : pythonMetadataCheck cherche « checks-base »
+    # au lieu de « datadog-checks-base ». À retirer quand nixpkgs#datadog-agent rebuild.
     nixpkgs.overlays = [
       (final: prev: {
         datadog-integrations-core = extras:

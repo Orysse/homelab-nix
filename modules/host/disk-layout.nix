@@ -1,12 +1,5 @@
-# Disque unique : ESP + un btrfs découpé en sous-volumes.
-#
-#   @root      -> /                  système (reconstructible, snapshotable seul)
-#   @nix       -> /nix               store, gros et 100 % reproductible
-#   @log       -> /var/log           les logs ne remplissent pas / et survivent à un rollback de @root
-#   @microvms  -> /var/lib/microvms  état des VMs (identité SSH) et, en phase 2, volumes Longhorn
-#
-# Un seul pool btrfs plutôt que des partitions fixes : pas de taille à deviner,
-# l'espace libre est commun à tous les sous-volumes.
+# Un pool btrfs plutôt que des partitions : pas de taille à figer. Sous-volumes séparés
+# pour restaurer @root sans toucher au store, aux logs ni à l'état des VMs.
 { inputs, ... }:
 {
   flake.modules.nixos.disk-layout = { config, lib, ... }: {

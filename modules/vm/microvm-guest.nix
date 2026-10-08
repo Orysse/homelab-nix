@@ -1,4 +1,4 @@
-# Base commune des invités. Paramétrée par le nom du nœud via `_module.args.node`.
+# `node` (specialArgs) : nom du nœud dans la topologie.
 { config, ... }:
 let
   inherit (config) cluster;
@@ -32,7 +32,6 @@ in
             tag = "ro-store";
             proto = "virtiofs";
           }
-          # Identité (clés SSH d'hôte). Source côté host créée par le module host microvm.
           {
             source = "/var/lib/microvms/${node}/persist";
             mountPoint = "/persist";
@@ -40,7 +39,6 @@ in
             proto = "virtiofs";
           }
         ];
-        # Root = tmpfs par défaut, aucun volume, pas de writableStoreOverlay.
       };
 
       services.openssh.hostKeys = [{
@@ -52,11 +50,9 @@ in
       networking.useDHCP = false;
       systemd.network.enable = true;
       systemd.network.networks."20-lan" = {
-        # Par MAC (dérivée, donc connue) et pas par Type = "ether" : les veth des pods
-        # sont aussi "ether" et networkd leur collerait l'IP du nœud.
+        # Pas Type = "ether" : les veth des pods matcheraient et recevraient l'IP du nœud.
         matchConfig.MACAddress = clusterLib.macOf node;
-        # Pas d'IPv6 globale (SLAAC de la box) : k3s la choisirait comme IP de nœud,
-        # et le préfixe opérateur peut changer. Le lien local IPv6 reste.
+        # Sinon k3s prend l'IPv6 SLAAC de la box (préfixe opérateur, non stable) comme IP de nœud.
         networkConfig = clusterLib.lanNetworkConfig cluster spec.address // {
           IPv6AcceptRA = false;
         };
@@ -65,7 +61,6 @@ in
       services.resolved.settings.Resolve.MulticastDNS = "yes";
       networking.firewall.allowedUDPPorts = [ 5353 ];
 
-      # Interfaces créées par le CNI : laissées à k3s/flannel.
       systemd.network.networks."19-cni-unmanaged" = {
         matchConfig.Name = [ "veth*" "cni0" "flannel*" ];
         linkConfig.Unmanaged = true;
