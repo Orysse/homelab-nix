@@ -27,7 +27,7 @@ in
       site = cluster.datadog.site;
       apiKeyFile = config.sops.secrets.datadog-api-key.path;
       hostname = config.networking.hostName;
-      tags = [ "cluster:${cluster.name}" "role:hypervisor" ];
+      tags = [ "cluster:${cluster.name}" "env:homelab" "role:hypervisor" ];
       enableLiveProcessCollection = true;
     };
   };
