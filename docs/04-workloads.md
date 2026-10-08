@@ -13,7 +13,7 @@ the content.
 | File | Role |
 |---|---|
 | `flux.nix` | pinned `flux2` Helm chart (version + hash), `GitRepository` + `Kustomization` pointing to `cluster.gitops`, `cluster-vars` ConfigMap |
-| `flux-sops.nix` | Flux's sops decryption key, derived from kube-1's SSH host key |
+| `flux-sops.nix` | Flux's dedicated sops (age) key, generated once on kube-1 in `/persist` |
 | `manifests.nix` | `homelab.k3s.manifests.<name>` -> `<name>.json` in k3s's manifests directory; removes manifests that are no longer declared when k3s starts |
 | `node.nix` | server/agent role, data volume, `servicelb` disabled (replaced by MetalLB) |
 

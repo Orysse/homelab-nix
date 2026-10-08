@@ -55,7 +55,7 @@ TCP 80/443 → `192.168.1.240` (MetalLB IP of Traefik), UDP 51820 → nuc1 (VPN)
 A single `*.abe.lc` certificate served by default by Traefik (TLSStore `default`); HTTP redirects to HTTPS. DNS-01 does not depend on the cluster being reachable.
 
 **D18 (2026-10-08) — Secrets: sops + age everywhere.**
-Recipients: the owner's software age key (itself encrypted for their YubiKey in `nix-secrets`) and YubiKey, plus the consuming machine (SSH host key converted to age). sops-nix on the host, Flux decryption in the cluster.
+Recipients: the owner's software age key (itself encrypted for their YubiKey in `nix-secrets`) and YubiKey, plus the consumer: the host's SSH host key converted to age (sops-nix on nuc1), and a dedicated age key generated on kube-1 for Flux (not derived from its SSH host key, so reading the Secret does not allow impersonating the node).
 
 **D19 (2026-10-08) — Datadog on the US5 site.** Agent on nuc1 (Nix) and in the cluster (Datadog Operator), same cluster tag. Workaround in place for a nixpkgs-unstable build failure of the Python integrations.
 
@@ -65,4 +65,4 @@ Recipients: the owner's software age key (itself encrypted for their YubiKey in 
 
 **D12 — Repository hosting and input updates.** `homelab-cluster` is on GitHub; `homelab-nix` is local only. Update process for flake inputs, charts and images (Renovate? scheduled `nix flake update`?) still to decide.
 
-**Security audit (2026-10-08)** — pending fixes: YubiKey-backed SSH key for root, forward filtering on the VPN, encrypted flannel backend, dedicated Flux age key, signed commits verification, k3s secrets encryption, HTTP security headers and CAA record.
+**Security audit (2026-10-08)** — done: YubiKey SSH key for root (laptop file key kept as fallback), VPN clients limited to the homelab, flannel over WireGuard, node-only etcd/kubelet/memberlist, k3s secrets encryption, dedicated Flux age key, HTTP security headers, CAA (Let's Encrypt), Renovate config. Open: GitHub 2FA and branch protection on homelab-cluster (owner), Cloudflare Universal SSL to disable (it adds its own CAs to the CAA set), flake input update routine.
