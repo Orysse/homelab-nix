@@ -3,9 +3,8 @@
 #   VictoriaMetrics :8428  metrics (Prometheus API), pushed by Alloy in the cluster,
 #                          scrapes this host's exporters itself
 #   VictoriaLogs    :9428  logs, pushed by Alloy and by systemd-journal-upload (journald)
-#   Grafana         :3000  dashboards and alerts (email through homelab@<domain>),
-#                          routed at grafana.int.<domain> by the cluster's internal Gateway
-# The three ports only accept the nodes; on the host itself everything is on localhost.
+# Alerting: alerting.nix (vmalert + Alertmanager). Dashboards: Grafana, in the cluster.
+# Both ports only accept the nodes; the exporters listen on localhost.
 { config, ... }:
 let
   inherit (config) cluster;
@@ -19,8 +18,6 @@ in
       fromNodes = port: lib.concatMapStrings
         (ip: "iptables -A nixos-fw -p tcp -s ${ip} --dport ${toString port} -j nixos-fw-accept\n")
         nodeIPs;
-      secret = name: "$__file{${config.sops.secrets.${name}.path}}";
-
       # WireGuard exporter: peers named after the topology, not their public key.
       wgNames = pkgs.writeText "wg0-names.conf" (lib.concatStrings (lib.mapAttrsToList (name: peer: ''
         [Peer]
@@ -28,16 +25,6 @@ in
         PublicKey = ${peer.publicKey}
         AllowedIPs = ${peer.address}/32
       '') cluster.vpn.peers));
-
-      dashboards = pkgs.linkFarm "grafana-dashboards" [
-        {
-          name = "node-exporter-full.json";
-          path = pkgs.fetchurl {
-            url = "https://grafana.com/api/dashboards/1860/revisions/45/download";
-            hash = "sha256-GExrdAnzBtp1Ul13cvcZRbEM6iOtFrXXjEaY6g6lGYY=";
-          };
-        }
-      ];
     in
     lib.mkIf (cluster.monitoring.host == host) {
       services.victoriametrics = {
@@ -54,7 +41,8 @@ in
           smartctl = 9633;
           victoriametrics = 8428;
           victorialogs = 9428;
-          grafana = 3000;
+          vmalert = 8880;
+          alertmanager = 9093;
         };
       };
 
@@ -81,7 +69,7 @@ in
           enabledCollectors = [ "systemd" ];
           extraFlags = [
             # Units worth watching: the VMs and what the host serves.
-            "--collector.systemd.unit-include=(microvm.*|sshd|systemd-networkd|ddclient|nfs-server|btrbk-.*|victoria.*|grafana|systemd-journal-upload)\\.(service|timer)"
+            "--collector.systemd.unit-include=(microvm.*|sshd|systemd-networkd|ddclient|nfs-server|btrbk-.*|victoria.*|vmalert-.*|alertmanager|systemd-journal-upload)\\.(service|timer)"
           ];
         };
         wireguard = {
@@ -95,63 +83,6 @@ in
         };
       };
 
-      sops.secrets = lib.mkIf config.services.grafana.enable (lib.genAttrs [ "grafana-admin-password" "grafana-secret-key" "smtp-password" ]
-        (_: { owner = "grafana"; }));
-
-      services.grafana = {
-        enable = true;
-        # Grafana 13 ships Prometheus as a separate plugin; VictoriaMetrics speaks its API.
-        declarativePlugins = with pkgs.grafanaPlugins; [ prometheus victoriametrics-logs-datasource ];
-        settings = {
-          server = {
-            http_addr = "0.0.0.0";
-            http_port = 3000;
-            domain = "grafana.int.${domain}";
-            root_url = "https://grafana.int.${domain}/";
-          };
-          security = {
-            admin_user = "admin";
-            admin_password = secret "grafana-admin-password";
-            secret_key = secret "grafana-secret-key";
-            cookie_secure = true;
-          };
-          users.allow_sign_up = false;
-          analytics = { reporting_enabled = false; check_for_updates = false; };
-          smtp = {
-            enabled = true;
-            host = "smtp.mail.ovh.net:465";   # implicit TLS
-            startTLS_policy = "NoStartTLS";
-            user = "homelab@${domain}";
-            password = secret "smtp-password";
-            from_address = "homelab@${domain}";
-            from_name = "Homelab";
-          };
-        };
-        provision = {
-          enable = true;
-          datasources.settings.datasources = [
-            {
-              name = "VictoriaMetrics";
-              uid = "victoriametrics";
-              type = "prometheus";
-              url = "http://127.0.0.1:8428";
-              isDefault = true;
-            }
-            {
-              name = "VictoriaLogs";
-              uid = "victorialogs";
-              type = "victoriametrics-logs-datasource";
-              url = "http://127.0.0.1:9428";
-            }
-          ];
-          dashboards.settings.providers = [{
-            name = "homelab";
-            options.path = dashboards;
-            allowUiUpdates = false;
-          }];
-        };
-      };
-
-      networking.firewall.extraCommands = fromNodes 8428 + fromNodes 9428 + fromNodes 3000;
+      networking.firewall.extraCommands = fromNodes 8428 + fromNodes 9428;
     };
 }
