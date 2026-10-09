@@ -28,9 +28,11 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
   OpenBao (in the cluster). Secrets: sops for the platform, OpenBao for apps.
 - Identity (D25): Pocket-ID at `auth.abe.lc`; the k3s API server accepts its tokens
   (topology `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.abe.lc`.
+  Friends are cluster admins; API audit log (people only) in VictoriaLogs.
 - Updates (D26): Renovate PRs (weekly `flake.lock`), CI runs `nix flake check`, deploy by hand.
   k3s pinned to `k3s_1_36`, PostgreSQL to 18.
-- nuc1 PSU is 65 W: CPU capped at 25 W. Deploy host changes in small steps.
+- nuc1 PSU is 65 W: CPU capped at 25 W. Deploy host changes in small steps. NIC offloads off
+  (e1000e hang, 2026-10-09).
 - Addressing: `docs/facts.md`. Kubeconfigs (outside the repo): `~/.kube/configs/homelab-oidc.yaml`
   (Pocket-ID, daily use), `homelab-nix.yaml` (admin certificate, break-glass).
 
