@@ -2,8 +2,6 @@
   cluster = {
     name = "homelab";
 
-    datadog.site = "us5.datadoghq.com";
-
     # Router DHCP: .10–.150. Outside DHCP:
     #   .200–.209  physical hosts
     #   .210–.239  k3s nodes (kube-N = .21N)

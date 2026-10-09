@@ -42,7 +42,7 @@ Reason: ephemeral state breaks node re-joining (node password rejected) and keep
 **D13 — Guest network matched by MAC, CNI interfaces unmanaged.** `Type = "ether"` also matched the pods' veths: networkd gave them the node's IP and broke pod networking. `20-lan` matches the derived MAC; `veth*`, `cni0`, `flannel*` are `Unmanaged`.
 
 **D14 (2026-10-07) — Base in Nix, cluster content in GitOps (Flux).**
-This repository stops at k3s + Flux; MetalLB, Traefik, cert-manager, Datadog and the apps live in `homelab-cluster` (public, GitHub), applied by Flux. Reason: declared in Nix, the manifests were part of the `kube-1` VM configuration — every app change restarted the control plane. The network stays defined once (Nix topology) and reaches the cluster through the `cluster-vars` ConfigMap.
+This repository stops at k3s + Flux; MetalLB, Traefik, cert-manager, the monitoring collectors, Grafana and the apps live in `homelab-cluster` (public, GitHub), applied by Flux. Reason: declared in Nix, the manifests were part of the `kube-1` VM configuration — every app change restarted the control plane. The network stays defined once (Nix topology) and reaches the cluster through the `cluster-vars` ConfigMap.
 Rejected alternatives: Argo CD (heavier on RAM), apps in the same repository (mixing tools).
 
 **D15 (2026-10-08) — Domain `abe.lc`: registrar OVH, DNS at Cloudflare.**
@@ -57,13 +57,21 @@ A single `*.abe.lc` certificate served by default by Traefik (TLSStore `default`
 **D18 (2026-10-08) — Secrets: sops + age everywhere.**
 Recipients: the owner's software age key (itself encrypted for their YubiKey in `nix-secrets`) and YubiKey, plus the consumer: the host's SSH host key converted to age (sops-nix on nuc1), and a dedicated age key generated on kube-1 for Flux (not derived from its SSH host key, so reading the Secret does not allow impersonating the node).
 
-**D19 (2026-10-08) — Datadog on the US5 site.** Agent on nuc1 (Nix) and in the cluster (Datadog Operator), same cluster tag. Workaround in place for a nixpkgs-unstable build failure of the Python integrations.
+**D19 (2026-10-08, replaced by D23 on 2026-10-09) — Datadog on the US5 site.** Agent on nuc1 (Nix) and in the cluster (Datadog Operator), same cluster tag. Workaround in place for a nixpkgs-unstable build failure of the Python integrations.
 
 **D20 (2026-10-08) — Admin VPN: WireGuard on nuc1**, `10.250.0.0/24` (`10.100.0.0/24` is used by a school tunnel). Clients only route `192.168.1.192/26`, so remote LANs in `192.168.1.0/24` are not shadowed.
 
 **D21 (2026-10-09) — All persistent data on the storage host (NFS), VMs disposable.**
 nuc1 exports the top-level btrfs subvolume `@data` (`/srv/data`) over NFSv4.1+ to the three nodes only (TCP 2049, firewall per node IP, `no_root_squash` for the CSI controller); the cluster uses csi-driver-nfs with the default StorageClass `nfs`, one directory per volume `<namespace>_<pvc>` (the driver archives the first path component on delete, so no nesting). btrbk snapshots `@data` hourly into the top-level subvolume `@snapshots` (48 h, 14 d, 8 w). k3s `local-storage` is disabled and etcd snapshots go to `/persist` (virtiofs, on the host). Both subvolumes were created once on the live disk; disko creates them on a reinstall.
 Reason: a VM must be destroyable without losing data; data stays readable and restorable on the host. Rejected: local-path (state inside the VM disk), Longhorn (replicated state inside the VMs, RAM), virtiofs + local-path (pods pinned to a node, single host only). Next: offsite copy (restic from the snapshots).
+
+**D22 (2026-10-09) — What runs on the hosts, what runs in the cluster.**
+On the hosts (NixOS): what carries the cluster or is needed to repair it — hypervisor, VPN, storage (D21), DDNS, bootstrap secrets (sops-nix), and the monitoring backends and alerting (D23). In the cluster (Flux): everything else, including stateful services (Pocket-ID, OpenBao, apps), whose data lives on NFS. Host services are placed by role in the topology (`vpn.host`, `storage.host`, `monitoring.host`), so a second host only takes topology lines. Hosts will be deployed with deploy-rs (automatic rollback if a host stops answering) before a second host is added. HA is not a goal (principle 6): nothing lost, everything rebuilt.
+
+**D23 (2026-10-09) — Monitoring: VictoriaMetrics, VictoriaLogs, vmalert, Alertmanager on the monitoring host; Grafana and collectors in the cluster.**
+Datadog took about 1.8 GB in the VMs (a third of their used memory) for a use case it does not fit. Backends on nuc1 (`monitoring.nix`, `alerting.nix`): metrics and logs stay home and keep their history when the cluster is down; vmalert evaluates the rules (`_alert-rules.nix`) and Alertmanager emails them through the `homelab@abe.lc` mailbox (OVH, SPF/DKIM/DMARC pass), so alerts still fire with the cluster down. In the cluster: Grafana Alloy (metrics + logs, node-local), kube-state-metrics (with Flux object state), node-exporter, and Grafana for dashboards only (provisioned from git, database on NFS). Standard split (alerts in the metrics backend, Grafana for display). Collectors ~0.5 GB in the VMs. Not covered: the monitoring host dying — needs an external heartbeat (the always-firing Watchdog alert is routed nowhere until then). Traces: later (Tempo) if an instrumented app appears.
+
+**Hardware note (2026-10-09).** nuc1 runs on a 65 W power supply (90 W expected): CPU bursts cut it during switches, which also left the Nix store with registered but missing paths. CPU limits PL1 = PL2 = 25 W (`machines/nuc1.nix`). After any power cut during a deploy: `nix-store --verify --check-contents` on the host before redeploying.
 
 ## Open questions
 

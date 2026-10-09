@@ -60,12 +60,7 @@ in
 
     name = mkOption {
       type = types.str;
-      description = "Cluster name (observability tags, Datadog clusterName).";
-    };
-
-    datadog.site = mkOption {
-      type = types.str;
-      description = "Datadog site (account region), e.g. datadoghq.com (US1), datadoghq.eu.";
+      description = "Cluster name (the `cluster` label on metrics and logs).";
     };
 
     vpn = {

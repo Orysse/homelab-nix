@@ -10,15 +10,19 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 
 - Phase 1 (host + microVMs) done, gates G0–G6 validated on 2026-10-07.
 - k3s: `kube-1` server (etcd, `clusterInit`), `kube-2`/`kube-3` agents (`modules/k3s/`).
-- Cluster content (MetalLB, Traefik, cert-manager, Datadog, apps) lives in the
-  `homelab-cluster` repository, applied by Flux. Do not redeclare it here.
+- Cluster content (MetalLB, Traefik, cert-manager, storage class, monitoring collectors,
+  Grafana, apps) lives in the `homelab-cluster` repository, applied by Flux. Do not
+  redeclare it here.
 - Entry point: Traefik on `192.168.1.240` (MetalLB), apps on `<app>.abe.lc`, wildcard
   Let's Encrypt certificate. Router port forwarding: TCP 80/443 -> `.240`, UDP 51820 -> nuc1.
 - Secrets: sops-nix on the host (`secrets/nuc1.yaml`), sops + Flux in the cluster.
-- Admin VPN: WireGuard on nuc1 (`10.250.0.0/24`). Dynamic DNS (ddclient) and a Datadog
-  agent run on nuc1. No impermanence on the host (D1 revised).
+- Admin VPN: WireGuard on nuc1 (`10.250.0.0/24`). Dynamic DNS (ddclient) runs on nuc1.
+  No impermanence on the host (D1 revised).
 - Storage: all persistent data on nuc1 (`/srv/data`, NFS to the nodes, btrbk snapshots), see D21.
   No state inside the VMs.
+- Monitoring (D23): VictoriaMetrics, VictoriaLogs, vmalert, Alertmanager on nuc1 (email alerts
+  through homelab@abe.lc); Grafana at `grafana.int.abe.lc`, in the cluster. Host rule: D22.
+- nuc1 PSU is 65 W: CPU capped at 25 W. Deploy host changes in small steps.
 - Addressing: `docs/facts.md`. Kubeconfig (outside the repo): `~/.kube/configs/homelab-nix.yaml`.
 
 Update this section when the state changes.

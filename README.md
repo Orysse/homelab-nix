@@ -38,7 +38,7 @@ secrets/nuc1.yaml          host secrets, encrypted with sops (see .sops.yaml)
 modules/
 ├─ topology/topology.nix   THE source of truth: network, hosts, nodes, entry point, VPN
 ├─ topology/               its schema (options.nix), helpers (_lib.nix), checks (assertions.nix)
-├─ host/                   physical host modules: disk, boot, ssh, bridge, secrets, VPN, DDNS, Datadog
+├─ host/                   physical host modules: disk, boot, ssh, bridge, secrets, VPN, DDNS, storage, monitoring, alerting
 ├─ vm/                     microVMs generated from the topology (host side + guest base)
 ├─ k3s/                    k3s node (server/agent role), token, Flux bootstrap
 └─ machines/nuc1.nix       composition of a physical host: which modules, which disk, which NIC

@@ -49,7 +49,6 @@ in
       metadata = { name = "cluster-vars"; namespace = "flux-system"; };
       data = {
         CLUSTER_NAME = cluster.name;
-        DD_SITE = cluster.datadog.site;
         DOMAIN = cluster.ingress.domain;
         INGRESS_ADDRESS = cluster.ingress.address;
         INTERNAL_ADDRESS = cluster.ingress.internalAddress;
