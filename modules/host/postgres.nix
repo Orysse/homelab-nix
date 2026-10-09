@@ -40,9 +40,19 @@ in
         requires = [ "postgresql-setup.service" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = { Type = "oneshot"; RemainAfterExit = true; User = "postgres"; };
+        # The sops password is only a bootstrap value: once OpenBao has rotated it
+        # (rotate-root), only OpenBao knows the real one, so it is set only when missing.
         script = ''
-          ${psql} -v ON_ERROR_STOP=1 -v pw="$(cat ${config.sops.secrets.postgres-openbao-password.path})" <<'SQL'
+          missing=$(${psql} -At <<'SQL'
+          SELECT rolpassword IS NULL FROM pg_authid WHERE rolname = 'openbao';
+          SQL
+          )
+          if [ "$missing" = t ]; then
+            ${psql} -v ON_ERROR_STOP=1 -v pw="$(cat ${config.sops.secrets.postgres-openbao-password.path})" <<'SQL'
           ALTER ROLE openbao PASSWORD :'pw';
+          SQL
+          fi
+          ${psql} -v ON_ERROR_STOP=1 <<'SQL'
           ${lib.concatMapStrings (db: ''GRANT "${db}" TO openbao WITH ADMIN OPTION;'' + "\n") dbs}
           SQL
         '';
