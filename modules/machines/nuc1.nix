@@ -45,7 +45,7 @@ in
         # Known e1000e bug with segmentation offload; the usual fix is to turn it off.
         systemd.services.lan-nic-offload = {
           description = "Disable TSO/GSO on the LAN NIC (e1000e hangs)";
-          wantedBy = [ "sys-subsystem-net-devices-eno1.device" ];
+          wantedBy = [ "multi-user.target" ];
           bindsTo = [ "sys-subsystem-net-devices-eno1.device" ];
           after = [ "sys-subsystem-net-devices-eno1.device" ];
           serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };

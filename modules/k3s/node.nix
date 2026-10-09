@@ -104,7 +104,8 @@ in
             { level = "None"; userGroups = [ "system:serviceaccounts" "system:nodes" ]; }
             { level = "None"; users = [
                 "system:kube-controller-manager" "system:kube-scheduler" "system:kube-proxy"
-                "system:apiserver" "system:k3s-controller" "system:cloud-controller-manager"
+                "system:apiserver" "system:k3s-controller" "system:k3s-supervisor"
+                "system:cloud-controller-manager" "k3s-cloud-controller-manager"
               ]; }
             { level = "Metadata"; resources = [{ group = ""; resources = [ "secrets" "configmaps" ]; }]; }
             { level = "None"; verbs = [ "get" "list" "watch" ]; }
