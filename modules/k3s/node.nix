@@ -49,6 +49,16 @@ in
             "--secrets-encryption"
             # Pod traffic between nodes encrypted and authenticated (VXLAN is neither).
             "--flannel-backend=wireguard-native"
+            # People log in to the API with Authelia (OIDC issuer auth.<domain>): `kubectl
+            # oidc-login`. Identities are prefixed "oidc:" so they never collide with
+            # built-in users; RBAC lives in homelab-cluster. The admin kubeconfig (client
+            # certificate) keeps working if Authelia is down.
+            "--kube-apiserver-arg=oidc-issuer-url=https://auth.${cluster.ingress.domain}"
+            "--kube-apiserver-arg=oidc-client-id=kubernetes"
+            "--kube-apiserver-arg=oidc-username-claim=preferred_username"
+            "--kube-apiserver-arg=oidc-username-prefix=oidc:"
+            "--kube-apiserver-arg=oidc-groups-claim=groups"
+            "--kube-apiserver-arg=oidc-groups-prefix=oidc:"
           ]
           ++ lib.optional (spec.address != null) "--tls-san=${spec.address}"
         );

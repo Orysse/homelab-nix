@@ -34,6 +34,12 @@
       routes = [ "192.168.1.192/26" ];
       peers = {
         thinkpad = { address = "10.250.0.2"; publicKey = "Gc7BSQE6PfLylPg2Zam2r3a9aaANhhc0nY07bPNQWS4="; };
+        # Guest: only the Kubernetes API (kubectl via Authelia OIDC), no SSH, no LAN.
+        # lenny = {
+        #   address = "10.250.0.10";
+        #   publicKey = "<his wg public key>";
+        #   access = [ { address = "192.168.1.211"; port = 6443; } ];
+        # };
       };
     };
 
