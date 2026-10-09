@@ -64,3 +64,18 @@ ssh root@192.168.1.211 k3s kubectl get nodes                            # cluste
 
 Changing an IP, a node's RAM, or moving a node to another host is a one-line change in
 `modules/topology/topology.nix`.
+
+## Updates
+
+Renovate opens a pull request every Monday morning with the new `flake.lock` (nixpkgs and
+the other inputs), plus one for the GitHub Actions. CI (`.github/workflows/check.yml`) runs
+`nix flake check` on it, which builds the whole host. Merge it, then deploy:
+
+```bash
+git pull && nix run .#deploy-rs -- .#nuc1     # rolls back on its own if nuc1 stops answering
+```
+
+Two versions are pinned on purpose and move only by hand: Kubernetes (`pkgs.k3s_1_36` in
+`modules/k3s/node.nix`, one minor version at a time) and PostgreSQL (`postgresql_18` in
+`modules/host/postgres.nix`, a major version needs a data migration). Cluster content
+(charts, images) is updated in `homelab-cluster`.

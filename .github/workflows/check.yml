@@ -1,0 +1,22 @@
+# Every pull request (Renovate's weekly flake.lock update included) and every push to main:
+# the flake evaluates, the topology tests pass and the whole host builds (deploy-rs's
+# activation check builds nuc1 with its microVMs). Deploying stays manual: deploy-rs from
+# the laptop, after merging.
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: nix flake check (builds nuc1)
+        run: nix flake check -L

@@ -7,7 +7,7 @@ let
   bootstrapModule = config.flake.modules.nixos.k3s-bootstrap;
 in
 {
-  flake.modules.nixos.k3s-node = { lib, node, ... }:
+  flake.modules.nixos.k3s-node = { lib, pkgs, node, ... }:
     let
       clusterLib = import ../topology/_lib.nix { inherit lib; };
       spec = cluster.nodes.${node};
@@ -32,6 +32,9 @@ in
 
       services.k3s = {
         enable = true;
+        # Kubernetes minor version, pinned: a flake update only brings its patch releases.
+        # Upgrading = one minor at a time (k3s_1_37, then the next), servers before agents.
+        package = pkgs.k3s_1_36;
         role = spec.role;
         tokenFile = "/persist/k3s-token";
         nodeName = node;
