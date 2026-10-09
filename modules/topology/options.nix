@@ -49,7 +49,7 @@ in
       path = mkOption {
         type = types.str;
         default = "/srv/data";
-        description = "Exported directory (btrfs subvolume @data); volumes are <path>/<namespace>/<pvc>.";
+        description = "Exported directory (btrfs subvolume @data); volumes are <path>/<namespace>_<pvc>.";
       };
     };
 

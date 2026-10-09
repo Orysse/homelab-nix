@@ -1,8 +1,8 @@
 # The storage host: all the cluster's persistent data lives here, on the btrfs subvolume
 # @data (disk-layout.nix), exported over NFSv4 to the nodes only. The VMs keep no state, so
 # they stay disposable. In the cluster: csi-driver-nfs, StorageClass "nfs", one directory
-# per volume (<namespace>/<pvc>).
-# Snapshots: btrbk, read-only, in the top-level @snapshots directory (outside @data).
+# per volume (<namespace>_<pvc>).
+# Snapshots: btrbk, hourly, read-only, in the top-level subvolume @snapshots (outside @data).
 { config, ... }:
 let
   inherit (config) cluster;
@@ -35,7 +35,7 @@ in
         fsType = "btrfs";
         options = [ "subvolid=5" "noatime" ];
       };
-      systemd.tmpfiles.rules = [ "d /mnt/btrfs/@snapshots 0700 root root -" ];
+      systemd.services.btrbk-data.unitConfig.RequiresMountsFor = [ "/mnt/btrfs" ];
 
       services.btrbk.instances.data = {
         onCalendar = "hourly";
