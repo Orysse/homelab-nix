@@ -26,6 +26,7 @@
     # All persistent data lives on this host (NFS to the nodes, btrfs snapshots): the VMs
     # stay disposable.
     storage.host = "nuc1";
+    monitoring.host = "nuc1";   # metrics, logs, dashboards, alerts
 
     # Router port forwarding: UDP 51820 -> nuc1.
     # 10.100.0.0/24 is already used by the school's cyber range tunnel.

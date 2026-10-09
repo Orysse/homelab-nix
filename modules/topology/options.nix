@@ -53,6 +53,11 @@ in
       };
     };
 
+    monitoring.host = mkOption {
+      type = types.str;
+      description = "Physical host running the monitoring backends (VictoriaMetrics, VictoriaLogs, Grafana). Below the cluster: it must work when the cluster does not.";
+    };
+
     name = mkOption {
       type = types.str;
       description = "Cluster name (observability tags, Datadog clusterName).";
