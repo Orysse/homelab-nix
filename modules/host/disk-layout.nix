@@ -39,6 +39,7 @@
                   "/@nix" = { mountpoint = "/nix"; mountOptions = opts; };
                   "/@log" = { mountpoint = "/var/log"; mountOptions = opts; };
                   "/@microvms" = { mountpoint = "/var/lib/microvms"; mountOptions = opts; };
+                  "/@data" = { mountpoint = "/srv/data"; mountOptions = opts; };   # cluster volumes (storage.nix)
                 };
             };
           };

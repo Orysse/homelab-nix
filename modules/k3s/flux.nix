@@ -54,6 +54,8 @@ in
         INGRESS_ADDRESS = cluster.ingress.address;
         INTERNAL_ADDRESS = cluster.ingress.internalAddress;
         INGRESS_POOL = cluster.ingress.pool;
+        NFS_SERVER = cluster.hosts.${cluster.storage.host}.address;
+        NFS_SHARE = cluster.storage.path;
       };
     }];
   };

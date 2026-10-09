@@ -23,6 +23,10 @@
       domain = "abe.lc";
     };
 
+    # All persistent data lives on this host (NFS to the nodes, btrfs snapshots): the VMs
+    # stay disposable.
+    storage.host = "nuc1";
+
     # Router port forwarding: UDP 51820 -> nuc1.
     # 10.100.0.0/24 is already used by the school's cyber range tunnel.
     # routes: .192/26 only; the whole /24 would shadow remote LANs in 192.168.1.x.

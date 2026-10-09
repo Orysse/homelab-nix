@@ -37,7 +37,8 @@ in
         nodeName = node;
         nodeIP = spec.address;
         clusterInit = isServer && isBootstrap;
-        disable = lib.optionals isServer [ "servicelb" ];
+        # local-storage: volumes would live inside the VMs; they use NFS from the storage host.
+        disable = lib.optionals isServer [ "servicelb" "local-storage" ];
         serverAddr = lib.optionalString (!isBootstrap)
           "https://${clusterLib.endpointOf bootstrap cluster.nodes.${bootstrap}}:6443";
         # The 127.0.0.53 stub is unreachable from pods (kubelet would fall back to 8.8.8.8).
@@ -49,10 +50,15 @@ in
             "--secrets-encryption"
             # Pod traffic between nodes encrypted and authenticated (VXLAN is neither).
             "--flannel-backend=wireguard-native"
+            # On the host (/persist is a virtiofs share): survives the VM.
+            "--etcd-snapshot-dir=/persist/etcd-snapshots"
           ]
           ++ lib.optional (spec.address != null) "--tls-san=${spec.address}"
         );
       };
+
+      # Volumes are NFS mounts from the storage host (csi-driver-nfs mounts through this kernel).
+      boot.supportedFilesystems = [ "nfs" ];
 
       systemd.services.k3s = {
         unitConfig.RequiresMountsFor = [ "/var/lib/rancher" "/persist" ];

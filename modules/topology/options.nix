@@ -41,6 +41,18 @@ in
       };
     };
 
+    storage = {
+      host = mkOption {
+        type = types.str;
+        description = "Physical host holding all persistent data (NFS server for the cluster). The VMs keep no state.";
+      };
+      path = mkOption {
+        type = types.str;
+        default = "/srv/data";
+        description = "Exported directory (btrfs subvolume @data); volumes are <path>/<namespace>/<pvc>.";
+      };
+    };
+
     name = mkOption {
       type = types.str;
       description = "Cluster name (observability tags, Datadog clusterName).";
