@@ -30,14 +30,27 @@ in
     networking.firewall.allowedUDPPorts = [ vpn.port ];
 
     # Clients only reach the homelab (vpn.routes), not the rest of the LAN: the routes
-    # pushed to clients are only a client-side setting.
-    networking.firewall.extraCommands = ''
-      iptables -D FORWARD -i wg0 -j homelab-vpn-fwd 2>/dev/null || true
-      iptables -F homelab-vpn-fwd 2>/dev/null || iptables -N homelab-vpn-fwd
-      ${lib.concatMapStrings (net: "iptables -A homelab-vpn-fwd -d ${net} -j RETURN\n") vpn.routes}
-      iptables -A homelab-vpn-fwd -j REJECT --reject-with icmp-admin-prohibited
-      iptables -I FORWARD -i wg0 -j homelab-vpn-fwd
-    '';
+    # pushed to clients are only a client-side setting. Peers with an `access` list (guests)
+    # only reach those address/port pairs, and nothing on this host (no SSH).
+    networking.firewall.extraCommands =
+      let
+        guests = lib.filterAttrs (_: peer: peer.access != null) vpn.peers;
+        guestRules = lib.concatStrings (lib.mapAttrsToList (_: peer:
+          lib.concatMapStrings (a:
+            "iptables -A homelab-vpn-fwd -s ${peer.address} -d ${a.address} -p ${a.protocol} --dport ${toString a.port} -j RETURN\n"
+          ) peer.access
+          + "iptables -A homelab-vpn-fwd -s ${peer.address} -j REJECT --reject-with icmp-admin-prohibited\n"
+          + "iptables -I nixos-fw -i wg0 -s ${peer.address} -j nixos-fw-refuse\n"
+        ) guests);
+      in
+      ''
+        iptables -D FORWARD -i wg0 -j homelab-vpn-fwd 2>/dev/null || true
+        iptables -F homelab-vpn-fwd 2>/dev/null || iptables -N homelab-vpn-fwd
+        ${guestRules}
+        ${lib.concatMapStrings (net: "iptables -A homelab-vpn-fwd -d ${net} -j RETURN\n") vpn.routes}
+        iptables -A homelab-vpn-fwd -j REJECT --reject-with icmp-admin-prohibited
+        iptables -I FORWARD -i wg0 -j homelab-vpn-fwd
+      '';
     networking.firewall.extraStopCommands = ''
       iptables -D FORWARD -i wg0 -j homelab-vpn-fwd 2>/dev/null || true
       iptables -F homelab-vpn-fwd 2>/dev/null || true

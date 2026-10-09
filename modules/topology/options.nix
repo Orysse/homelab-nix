@@ -115,6 +115,20 @@ in
           options = {
             address = mkOption { type = types.str; };
             publicKey = mkOption { type = types.str; };
+            access = mkOption {
+              description = ''
+                What this peer may reach. null: all of `routes` (admins). Otherwise only these
+                address/port pairs, and nothing on the VPN host itself (guests).
+              '';
+              default = null;
+              type = types.nullOr (types.listOf (types.submodule {
+                options = {
+                  address = mkOption { type = types.str; };
+                  port = mkOption { type = types.port; };
+                  protocol = mkOption { type = types.enum [ "tcp" "udp" ]; default = "tcp"; };
+                };
+              }));
+            };
           };
         });
       };
