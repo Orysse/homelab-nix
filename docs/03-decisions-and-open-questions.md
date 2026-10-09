@@ -61,6 +61,10 @@ Recipients: the owner's software age key (itself encrypted for their YubiKey in 
 
 **D20 (2026-10-08) — Admin VPN: WireGuard on nuc1**, `10.250.0.0/24` (`10.100.0.0/24` is used by a school tunnel). Clients only route `192.168.1.192/26`, so remote LANs in `192.168.1.0/24` are not shadowed.
 
+**D21 (2026-10-09) — All persistent data on the storage host (NFS), VMs disposable.**
+nuc1 exports the top-level btrfs subvolume `@data` (`/srv/data`) over NFSv4.1+ to the three nodes only (TCP 2049, firewall per node IP, `no_root_squash` for the CSI controller); the cluster uses csi-driver-nfs with the default StorageClass `nfs`, one directory per volume `<namespace>_<pvc>` (the driver archives the first path component on delete, so no nesting). btrbk snapshots `@data` hourly into the top-level subvolume `@snapshots` (48 h, 14 d, 8 w). k3s `local-storage` is disabled and etcd snapshots go to `/persist` (virtiofs, on the host). Both subvolumes were created once on the live disk; disko creates them on a reinstall.
+Reason: a VM must be destroyable without losing data; data stays readable and restorable on the host. Rejected: local-path (state inside the VM disk), Longhorn (replicated state inside the VMs, RAM), virtiofs + local-path (pods pinned to a node, single host only). Next: offsite copy (restic from the snapshots).
+
 ## Open questions
 
 **D12 — Repository hosting and input updates.** `homelab-cluster` is on GitHub; `homelab-nix` is local only. Update process for flake inputs, charts and images (Renovate? scheduled `nix flake update`?) still to decide.

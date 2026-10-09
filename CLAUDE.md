@@ -17,6 +17,8 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 - Secrets: sops-nix on the host (`secrets/nuc1.yaml`), sops + Flux in the cluster.
 - Admin VPN: WireGuard on nuc1 (`10.250.0.0/24`). Dynamic DNS (ddclient) and a Datadog
   agent run on nuc1. No impermanence on the host (D1 revised).
+- Storage: all persistent data on nuc1 (`/srv/data`, NFS to the nodes, btrbk snapshots), see D21.
+  No state inside the VMs.
 - Addressing: `docs/facts.md`. Kubeconfig (outside the repo): `~/.kube/configs/homelab-nix.yaml`.
 
 Update this section when the state changes.
