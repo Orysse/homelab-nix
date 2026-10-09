@@ -22,6 +22,8 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
   No state inside the VMs.
 - Monitoring (D23): VictoriaMetrics, VictoriaLogs, vmalert, Alertmanager on nuc1 (email alerts
   through homelab@abe.lc); Grafana at `grafana.int.abe.lc`, in the cluster. Host rule: D22.
+- Databases (D24): PostgreSQL on nuc1 (`@db`), one per app namespace, passwords owned by
+  OpenBao (in the cluster). Secrets: sops for the platform, OpenBao for apps.
 - nuc1 PSU is 65 W: CPU capped at 25 W. Deploy host changes in small steps.
 - Addressing: `docs/facts.md`. Kubeconfig (outside the repo): `~/.kube/configs/homelab-nix.yaml`.
 
