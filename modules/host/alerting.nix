@@ -4,6 +4,7 @@
 # homelab@<domain> mailbox. Grafana (in the cluster) only displays them.
 #   vmalert       127.0.0.1:8880
 #   Alertmanager  :9093  (the nodes may read it: Grafana's Alertmanager data source)
+#   Heartbeat     Watchdog -> Healthchecks.io every minute; it emails if the pings stop
 { config, ... }:
 let
   inherit (config) cluster;
@@ -31,6 +32,7 @@ in
       };
 
       sops.secrets.smtp-password = { };
+      sops.secrets.heartbeat-url = { };   # Healthchecks.io ping URL (anyone with it can ping)
       services.prometheus.alertmanager = {
         enable = true;
         port = 9093;
@@ -47,10 +49,24 @@ in
             group_wait = "30s";
             group_interval = "5m";
             repeat_interval = "4h";
-            routes = [{ matchers = [ "alertname = Watchdog" ]; receiver = "null"; }];
+            # Watchdog always fires: its notification is a heartbeat to Healthchecks.io, which
+            # emails when the pings stop (host down, internet down, alerting pipeline broken).
+            routes = [{
+              matchers = [ "alertname = Watchdog" ];
+              receiver = "heartbeat";
+              group_wait = "0s";
+              group_interval = "1m";
+              repeat_interval = "1m";
+            }];
           };
           receivers = [
-            { name = "null"; }
+            {
+              name = "heartbeat";
+              webhook_configs = [{
+                url_file = "/run/credentials/alertmanager.service/heartbeat-url";
+                send_resolved = false;
+              }];
+            }
             {
               name = "email";
               email_configs = [{ to = mailbox; send_resolved = true; }];
@@ -66,7 +82,10 @@ in
       };
       # The password stays root-only; systemd hands a copy to the (dynamic) service user.
       systemd.services.alertmanager.serviceConfig.LoadCredential =
-        [ "smtp-password:${config.sops.secrets.smtp-password.path}" ];
+        [
+        "smtp-password:${config.sops.secrets.smtp-password.path}"
+        "heartbeat-url:${config.sops.secrets.heartbeat-url.path}"
+      ];
 
       networking.firewall.extraCommands = lib.concatMapStrings
         (ip: "iptables -A nixos-fw -p tcp -s ${ip} --dport 9093 -j nixos-fw-accept\n")
