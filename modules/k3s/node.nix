@@ -52,9 +52,36 @@ in
             "--flannel-backend=wireguard-native"
             # On the host (/persist is a virtiofs share): survives the VM.
             "--etcd-snapshot-dir=/persist/etcd-snapshots"
+            # People: OIDC tokens from Pocket-ID (structured config below, several clients).
+            "--kube-apiserver-arg=authentication-config=/etc/kubernetes/authentication.yaml"
           ]
           ++ lib.optional (spec.address != null) "--tls-san=${spec.address}"
         );
+      };
+
+      # Kubernetes API authentication for people: ID tokens from the topology's OIDC issuer
+      # (Pocket-ID), for any of its clients. Users and groups are prefixed "oidc:" so they
+      # never collide with built-in ones; RBAC lives in homelab-cluster. The admin
+      # kubeconfig (client certificate) keeps working if Pocket-ID is down.
+      environment.etc."kubernetes/authentication.yaml" = lib.mkIf isServer {
+        text = builtins.toJSON {
+          apiVersion = "apiserver.config.k8s.io/v1";
+          kind = "AuthenticationConfiguration";
+          # k3s disables anonymous auth with a flag, which it skips when a config file is
+          # given: done here instead (as before, anonymous requests get 401).
+          anonymous.enabled = false;
+          jwt = [{
+            issuer = {
+              url = cluster.oidc.issuer;
+              audiences = cluster.oidc.audiences;
+              audienceMatchPolicy = "MatchAny";
+            };
+            claimMappings = {
+              username = { claim = "preferred_username"; prefix = "oidc:"; };
+              groups = { claim = "groups"; prefix = "oidc:"; };
+            };
+          }];
+        };
       };
 
       # Volumes are NFS mounts from the storage host (csi-driver-nfs mounts through this kernel).

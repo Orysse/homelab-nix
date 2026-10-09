@@ -27,6 +27,15 @@
     monitoring.host = "nuc1";   # metrics, logs, dashboards, alerts
     # Apps' PostgreSQL, on a local disk (SQLite on NFS corrupts). One database per
     # namespace; OpenBao owns the passwords (homelab-cluster: openbao/).
+    # People log in to the Kubernetes API through Pocket-ID (clients created in its UI).
+    oidc = {
+      issuer = "https://auth.abe.lc";
+      audiences = [
+        "46031658-1b1a-4d3b-8bfa-82dfaf67d4c4"   # kubernetes (kubectl oidc-login, public)
+        "da937e7f-357b-4310-831e-d09dfe89aa8c"   # headlamp
+      ];
+    };
+
     database = {
       host = "nuc1";
       databases = [ "pocket-id" "monitoring" ];

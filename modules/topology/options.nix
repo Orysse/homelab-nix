@@ -65,6 +65,17 @@ in
       };
     };
 
+    oidc = {
+      issuer = mkOption {
+        type = types.str;
+        description = "OIDC issuer the Kubernetes API trusts for people (Pocket-ID, in the cluster).";
+      };
+      audiences = mkOption {
+        type = types.listOf types.str;
+        description = "Client IDs (public values) whose ID tokens the API accepts: kubectl, Headlamp…";
+      };
+    };
+
     monitoring.host = mkOption {
       type = types.str;
       description = "Physical host running the monitoring backends (VictoriaMetrics, VictoriaLogs, Grafana). Below the cluster: it must work when the cluster does not.";
