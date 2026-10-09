@@ -69,8 +69,9 @@ Update this section when the state changes.
 - Only commit when asked to. No Claude co-author trailer in commit messages.
 - **No secrets in the repository** (private keys, passwords, tokens) other than sops-encrypted
   files. *Public* SSH keys are fine.
-- After a network change on a remote host, use `nixos-rebuild test` (reverted on reboot)
-  before `switch`, so as not to lock yourself out.
+- Deploy hosts with deploy-rs: it rolls back on its own if the host stops answering after
+  activation (magic rollback, 30 s), so a network change cannot lock you out. nuc1's PSU is
+  weak: deploy big host changes in small steps.
 - When information is missing (network, hardware…), ask the owner rather than inventing it.
 
 ## Useful commands
@@ -79,7 +80,6 @@ Update this section when the state changes.
 nix flake check
 nix build .#nixosConfigurations.nuc1.config.system.build.toplevel
 nix eval .#nixosConfigurations.nuc1.config.microvm.vms --apply builtins.attrNames
-nixos-rebuild test   --flake .#nuc1 --target-host root@192.168.1.200
-nixos-rebuild switch --flake .#nuc1 --target-host root@192.168.1.200
-nixos-rebuild switch --rollback    # on the host
+nix run .#deploy-rs -- .#nuc1      # deploy one host (nix run .#deploy-rs -- . for all)
+nixos-rebuild switch --rollback    # on the host, to go back by hand
 ```

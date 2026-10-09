@@ -25,7 +25,7 @@ base hands it the network parameters through the `cluster-vars` ConfigMap (see
 
 | Layer                            | Tool                  | Where                 |
 | -------------------------------- | --------------------- | --------------------- |
-| Machines: host, VMs, k3s         | Nix (`nixos-rebuild`) | this repository       |
+| Machines: host, VMs, k3s         | Nix (deploy-rs)       | this repository       |
 | Cluster content: platform, apps  | Flux (git push)       | `homelab-cluster`     |
 | Application code (e.g. the site) | CI -> image           | each app's repository |
 
@@ -58,7 +58,7 @@ ignored by import-tree.
 ```bash
 nix flake check                                                         # evaluation + topology tests
 nix build .#nixosConfigurations.nuc1.config.system.build.toplevel       # full build (host + VMs)
-nixos-rebuild switch --flake .#nuc1 --target-host root@192.168.1.200     # deploy
+nix run .#deploy-rs -- .#nuc1                                           # deploy (auto rollback)
 ssh root@192.168.1.211 k3s kubectl get nodes                            # cluster status
 ```
 

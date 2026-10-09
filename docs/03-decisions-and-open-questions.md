@@ -29,7 +29,7 @@ Reason: supports virtiofs and 9p, the most compatible. (✅ firecracker has neit
 Reason: VMs do not build; the overlay requires a volume (✅), hence an image — contrary to the core principle. The only per-VM volume is the k3s *data* volume (D9).
 
 **D8 — First deployment with nixos-anywhere** (disko + install in one command), then `nixos-rebuild --target-host`.
-Multi-host deployment tool (colmena, deploy-rs…) to reconsider once there is a second host.
+Since 2026-10-09: **deploy-rs** (`modules/deploy.nix`), one node per host of the topology, magic rollback. Chosen over colmena: flake-native, and the rollback protects remote network changes.
 
 **D9 (2026-10-07) — k3s state on a data volume per VM.**
 `microvm.volumes`: `/var/lib/microvms/<vm>/k3s-data.img` (ext4, sparse file, `dataDisk` MiB in the topology, 20 GiB default, btrfs `+C` attribute) mounted on `/var/lib/rancher`; `/etc/rancher` is a link to `/var/lib/rancher/etc`. The root stays a tmpfs.
