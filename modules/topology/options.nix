@@ -53,6 +53,18 @@ in
       };
     };
 
+    database = {
+      host = mkOption {
+        type = types.str;
+        description = "Physical host running PostgreSQL for the cluster's apps (data on its local disk, never NFS).";
+      };
+      databases = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+        description = "One database and one user per entry, named after the app's Kubernetes namespace. OpenBao manages the users' passwords.";
+      };
+    };
+
     monitoring.host = mkOption {
       type = types.str;
       description = "Physical host running the monitoring backends (VictoriaMetrics, VictoriaLogs, Grafana). Below the cluster: it must work when the cluster does not.";

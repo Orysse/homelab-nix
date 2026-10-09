@@ -20,6 +20,7 @@ in
       m.storage
       m.monitoring
       m.alerting
+      m.postgres
       {
         networking.hostName = "nuc1";
         homelab.diskDevice = "/dev/disk/by-id/nvme-KINGSTON_SNVS500G_50026B7685AD8136";

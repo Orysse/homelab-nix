@@ -25,6 +25,12 @@
     # stay disposable.
     storage.host = "nuc1";
     monitoring.host = "nuc1";   # metrics, logs, dashboards, alerts
+    # Apps' PostgreSQL, on a local disk (SQLite on NFS corrupts). One database per
+    # namespace; OpenBao owns the passwords (homelab-cluster: openbao/).
+    database = {
+      host = "nuc1";
+      databases = [ "pocket-id" "monitoring" ];
+    };
 
     # Router port forwarding: UDP 51820 -> nuc1.
     # 10.100.0.0/24 is already used by the school's cyber range tunnel.

@@ -40,6 +40,7 @@
                   "/@log" = { mountpoint = "/var/log"; mountOptions = opts; };
                   "/@microvms" = { mountpoint = "/var/lib/microvms"; mountOptions = opts; };
                   "/@data" = { mountpoint = "/srv/data"; mountOptions = opts; };   # cluster volumes (storage.nix)
+                  "/@db" = { mountpoint = "/var/lib/postgresql"; mountOptions = opts; };   # postgres.nix
                   "/@snapshots" = { };   # btrbk snapshots of @data (storage.nix), not mounted
                 };
             };
