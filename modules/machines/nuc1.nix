@@ -21,7 +21,7 @@ in
       m.monitoring
       m.alerting
       m.postgres
-      {
+      ({ pkgs, ... }: {
         networking.hostName = "nuc1";
         homelab.diskDevice = "/dev/disk/by-id/nvme-KINGSTON_SNVS500G_50026B7685AD8136";
         # Not "en*": a USB adapter (cdc_ncm) would be bridged too.
@@ -36,7 +36,22 @@ in
           p2 = { limit = 25; window = 0.00244; };
           useTimer = true;   # re-applied periodically, in case the firmware resets it
         };
-      }
+        # The timer rewrites the power-limit MSR every ~30 s; without this the kernel logs a
+        # warning each time.
+        boot.kernelParams = [ "msr.allow_writes=on" ];
+
+        # Intel I219 (e1000e) "Detected Hardware Unit Hang" under load (NFS, VM traffic on the
+        # bridge): the NIC stopped for good on 2026-10-09 and nuc1 went offline for 20 minutes.
+        # Known e1000e bug with segmentation offload; the usual fix is to turn it off.
+        systemd.services.lan-nic-offload = {
+          description = "Disable TSO/GSO on the LAN NIC (e1000e hangs)";
+          wantedBy = [ "sys-subsystem-net-devices-eno1.device" ];
+          bindsTo = [ "sys-subsystem-net-devices-eno1.device" ];
+          after = [ "sys-subsystem-net-devices-eno1.device" ];
+          serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
+          script = "${pkgs.ethtool}/bin/ethtool -K eno1 tso off gso off";
+        };
+      })
     ];
   };
 }
