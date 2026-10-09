@@ -58,6 +58,14 @@ in
         };
       };
 
+      # The node's journal (k3s, kubelet, API audit) into VictoriaLogs on the monitoring host.
+      # Pod logs go through Alloy instead (homelab-cluster).
+      services.journald.upload = {
+        enable = true;
+        settings.Upload.URL =
+          "http://${cluster.hosts.${cluster.monitoring.host}.address}:9428/insert/journald";
+      };
+
       services.resolved.settings.Resolve.MulticastDNS = "yes";
       networking.firewall.allowedUDPPorts = [ 5353 ];
 

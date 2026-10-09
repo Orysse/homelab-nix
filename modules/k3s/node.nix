@@ -57,6 +57,10 @@ in
             "--etcd-snapshot-dir=/persist/etcd-snapshots"
             # People: OIDC tokens from Pocket-ID (structured config below, several clients).
             "--kube-apiserver-arg=authentication-config=/etc/kubernetes/authentication.yaml"
+            # Who changed what through the API (policy below), into the journal, shipped to
+            # VictoriaLogs (microvm-guest.nix).
+            "--kube-apiserver-arg=audit-policy-file=/etc/kubernetes/audit-policy.yaml"
+            "--kube-apiserver-arg=audit-log-path=-"
           ]
           ++ lib.optional (spec.address != null) "--tls-san=${spec.address}"
         );
@@ -84,6 +88,29 @@ in
               groups = { claim = "groups"; prefix = "oidc:"; };
             };
           }];
+        };
+      };
+
+      # API audit: what people do (OIDC users, the admin certificate), never what the
+      # machines do (controllers, nodes, Flux and every other service account). Changes are
+      # logged (who, what, when, from where, result), reads are not, except secrets and
+      # config maps: who read them. Content is never logged (Metadata level).
+      environment.etc."kubernetes/audit-policy.yaml" = lib.mkIf isServer {
+        text = builtins.toJSON {
+          apiVersion = "audit.k8s.io/v1";
+          kind = "Policy";
+          omitStages = [ "RequestReceived" ];
+          rules = [
+            { level = "None"; userGroups = [ "system:serviceaccounts" "system:nodes" ]; }
+            { level = "None"; users = [
+                "system:kube-controller-manager" "system:kube-scheduler" "system:kube-proxy"
+                "system:apiserver" "system:k3s-controller" "system:cloud-controller-manager"
+              ]; }
+            { level = "Metadata"; resources = [{ group = ""; resources = [ "secrets" "configmaps" ]; }]; }
+            { level = "None"; verbs = [ "get" "list" "watch" ]; }
+            { level = "None"; nonResourceURLs = [ "/*" ]; }
+            { level = "Metadata"; }
+          ];
         };
       };
 
