@@ -17,6 +17,7 @@ in
       m.secrets
       m.ddns
       m.wireguard
+      m.headscale
       m.storage
       m.monitoring
       m.alerting

@@ -50,6 +50,13 @@
       serverAddress = "10.250.0.1";
       serverPublicKey = "TNugHNt2qsBT5T/3ac1HWzXFzrw24rWu1l0uCKZhWEM=";
       routes = [ "192.168.1.192/26" ];
+      # Headscale (Tailscale clients), replacing the WireGuard peers below once moved.
+      # Router port forwarding: TCP 8443 and UDP 41641 -> nuc1.
+      headscale = {
+        name = "hs.abe.lc";
+        baseDomain = "ts.abe.lc";
+        oidcClientId = "TODO";   # Pocket-ID client "headscale"
+      };
       peers = {
         thinkpad = { address = "10.250.0.2"; publicKey = "Gc7BSQE6PfLylPg2Zam2r3a9aaANhhc0nY07bPNQWS4="; };
         # Friends (cluster admins through Pocket-ID): the Kubernetes API and the internal
