@@ -103,6 +103,32 @@ in
       ];
     }
     {
+      # Tetragon (homelab-cluster: tetragon.yaml). Its "namespace" label is the process's
+      # namespace; the scrape's own namespace label (kube-system) pushes it to
+      # exported_namespace. "" = host processes. The events themselves are in VictoriaLogs
+      # (kube-system, container export-stdout).
+      name = "runtime";
+      rules = [
+        # A shell or network tool started in an app pod: a `kubectl exec` (also in the API
+        # audit log) or code execution through the app. OpenBao's entrypoint is a shell script.
+        (alert "SuspiciousExecInPod"
+          "sum by (exported_namespace, workload, binary) (increase(tetragon_events_total{type=\"PROCESS_EXEC\", exported_namespace!~\"|kube-system|openbao\", binary=~\".*/(sh|bash|dash|ash|zsh|busybox|curl|wget|nc|ncat|socat|python3?|perl)\"}[5m])) > 0"
+          "0m" "warning"
+          "{{ $labels.binary }} started in {{ $labels.exported_namespace }}/{{ $labels.workload }}"
+          "Was it you (`kubectl exec`, in the API audit log)? If not: VictoriaLogs, namespace kube-system, container export-stdout, search the workload for the parent process and arguments.")
+        (alert "SensitiveFileAccessInPod"
+          "sum by (exported_namespace, workload, binary) (increase(tetragon_events_total{type=\"PROCESS_KPROBE\", exported_namespace!=\"\"}[5m])) > 0"
+          "0m" "warning"
+          "{{ $labels.binary }} in {{ $labels.exported_namespace }}/{{ $labels.workload }} read a credential file or wrote under /etc"
+          "Tetragon policy sensitive-files. The path is in the event: VictoriaLogs, namespace kube-system, container export-stdout, `process_kprobe`.")
+        (alert "TetragonDown"
+          "up{job=\"tetragon\"} == 0"
+          "10m" "warning"
+          "Tetragon is not answering on {{ $labels.node }}"
+          "Runtime events are not recorded there. `kubectl -n kube-system logs -l app.kubernetes.io/name=tetragon -c tetragon --tail=50`.")
+      ];
+    }
+    {
       # Always firing. Alertmanager routes it to nobody for now; later to an external
       # heartbeat that alerts when it STOPS (monitoring host dead, power cut).
       name = "meta";
