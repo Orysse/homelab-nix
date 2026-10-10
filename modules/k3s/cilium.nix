@@ -38,11 +38,9 @@ in
 
           encryption = { enabled = true; type = "wireguard"; };
 
-          # k3s keeps its CNI files in its own directories.
-          cni = {
-            binPath = "/var/lib/rancher/k3s/data/cni";
-            confPath = "/var/lib/rancher/k3s/agent/etc/cni/net.d";
-          };
+          # CNI files in the standard paths (/etc/cni/net.d, /opt/cni/bin): with flannel off,
+          # k3s points containerd there, not at its own directories. On the VMs' tmpfs root;
+          # Cilium writes them again at every start.
 
           operator.replicas = 1;                 # one server
           prometheus.enabled = true;             # agent metrics (annotated, scraped by Alloy)
