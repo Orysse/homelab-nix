@@ -38,7 +38,7 @@
 
     database = {
       host = "nuc1";
-      databases = [ "pocket-id" "monitoring" ];
+      databases = [ "pocket-id" "monitoring" "umami" ];
     };
 
     # Router port forwarding: UDP 51820 -> nuc1.
@@ -74,8 +74,8 @@
     # mem in MB. Never exactly 2048: QEMU hangs (microvm.nix#171).
     nodes = {
       kube-1 = { host = "nuc1"; address = "192.168.1.211"; role = "server"; mem = 4000; vcpu = 2; };
-      kube-2 = { host = "nuc1"; address = "192.168.1.212"; role = "agent"; mem = 3000; vcpu = 2; };
-      kube-3 = { host = "nuc1"; address = "192.168.1.213"; role = "agent"; mem = 3000; vcpu = 2; };
+      kube-2 = { host = "nuc1"; address = "192.168.1.212"; role = "agent"; mem = 3500; vcpu = 2; };
+      kube-3 = { host = "nuc1"; address = "192.168.1.213"; role = "agent"; mem = 3500; vcpu = 2; };
     };
   };
 }
