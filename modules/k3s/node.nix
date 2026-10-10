@@ -136,11 +136,15 @@ in
           fromNodes = proto: port: lib.concatMapStrings
             (ip: "iptables -A nixos-fw -p ${proto} -s ${ip} --dport ${port} -j nixos-fw-accept\n")
             nodeIPs;
+          # Pods on other nodes (Cilium does not NAT pod-to-node traffic): metrics-server to
+          # the kubelets, hubble-relay to the Hubble agents.
+          fromPods = port: "iptables -A nixos-fw -p tcp -s 10.42.0.0/16 --dport ${port} -j nixos-fw-accept\n";
         in
         {
           allowedTCPPorts = [ 80 443 ] ++ lib.optionals isServer [ 6443 ];
           extraCommands = fromNodes "tcp" "10250" + fromNodes "tcp" "7946" + fromNodes "udp" "7946"
             + fromNodes "tcp" "4240" + fromNodes "tcp" "4244" + fromNodes "udp" "51871"
+            + fromPods "10250" + fromPods "4244"
             + lib.optionalString isServer (fromNodes "tcp" "2379:2380");
           # Pod-side interfaces (lxc*), Cilium's host and WireGuard devices.
           trustedInterfaces = [ "lxc+" "cilium_host" "cilium_net" "cilium_wg0" ];
