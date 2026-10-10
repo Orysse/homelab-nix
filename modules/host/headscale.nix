@@ -1,9 +1,11 @@
-# Headscale: self-hosted Tailscale control server, the VPN replacing wg0 (wireguard.nix,
-# kept until every client has moved). On the host, like wg0: it must survive a cluster outage.
+# Headscale: self-hosted Tailscale control server, the everyday VPN. On the host, like wg0:
+# it must survive a cluster outage. wg0 (wireguard.nix) stays as break-glass for the admin's
+# laptop: it needs neither the cluster nor Pocket-ID.
 #   control  https://<vpn.headscale.name>:<port>, router TCP forward to this host; certificate
 #            from Let's Encrypt by DNS-01 (the ddclient token can edit the zone)
 #   login    Pocket-ID, group "admins" only (the issuer runs in the cluster: when it is down,
-#            already-logged-in devices keep working, new logins wait)
+#            logged-in devices keep working until their key expires, 180 days; new logins
+#            wait, or use a pre-auth key created here)
 #   relays   Tailscale's public DERP servers (traffic stays end-to-end WireGuard-encrypted)
 #   routes   this host is the subnet router for vpn.routes (homelab only, not the whole LAN)
 # One-time setup (state in /var/lib/headscale and /var/lib/tailscale), see docs/cheatsheet.md:

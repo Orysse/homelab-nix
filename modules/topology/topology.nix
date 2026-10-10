@@ -50,7 +50,8 @@
       serverAddress = "10.250.0.1";
       serverPublicKey = "TNugHNt2qsBT5T/3ac1HWzXFzrw24rWu1l0uCKZhWEM=";
       routes = [ "192.168.1.192/26" ];
-      # Headscale (Tailscale clients), replacing the WireGuard peers below once moved.
+      # Headscale (Tailscale clients) for everyday use; the WireGuard peers below stay as
+      # break-glass (no dependency on the cluster or Pocket-ID).
       # Router port forwarding: TCP 8443 and UDP 41641 -> nuc1.
       headscale = {
         name = "hs.abe.lc";
