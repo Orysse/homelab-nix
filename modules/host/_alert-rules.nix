@@ -50,6 +50,11 @@ in
           "10m" "critical"
           "The cluster sends no metrics"
           "No kubelet scraped for 10 minutes: VMs down, Alloy down, or the network between them and the monitoring host.")
+        (alert "NodeMetricsMissing"
+          "kube_node_info unless on(node) label_replace(up{job=\"kubelet\"} == 1, \"node\", \"$1\", \"instance\", \"(.*)\")"
+          "15m" "warning"
+          "No metrics from node {{ $labels.node }}"
+          "The node exists but its Alloy sends nothing (stuck, crashed, or cut off). `kubectl -n monitoring get pods -l app.kubernetes.io/name=alloy -o wide`.")
         (alert "KubeNodeNotReady"
           "kube_node_status_condition{condition=\"Ready\",status=\"true\"} == 0"
           "10m" "critical"

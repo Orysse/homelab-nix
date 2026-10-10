@@ -76,7 +76,7 @@ in
           # host alerts, which explain it) get through.
           inhibit_rules = [{
             source_matchers = [ "alertname = ClusterNotReporting" ];
-            target_matchers = [ "alertname =~ KubeNodeNotReady|PodCrashLooping|DeploymentUnavailable|ContainerOOMKilled|FluxNotReady|StatusCheckFailing" ];
+            target_matchers = [ "alertname =~ NodeMetricsMissing|KubeNodeNotReady|PodCrashLooping|DeploymentUnavailable|ContainerOOMKilled|FluxNotReady|StatusCheckFailing" ];
           }];
         };
       };
