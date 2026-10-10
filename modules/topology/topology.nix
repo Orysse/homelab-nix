@@ -38,7 +38,7 @@
 
     database = {
       host = "nuc1";
-      databases = [ "pocket-id" "monitoring" "umami" ];
+      databases = [ "pocket-id" "monitoring" "umami" "headscale" ];
     };
 
     # Router port forwarding: UDP 51820 -> nuc1.
@@ -50,14 +50,10 @@
       serverAddress = "10.250.0.1";
       serverPublicKey = "TNugHNt2qsBT5T/3ac1HWzXFzrw24rWu1l0uCKZhWEM=";
       routes = [ "192.168.1.192/26" ];
-      # Headscale (Tailscale clients) for everyday use; the WireGuard peers below stay as
-      # break-glass (no dependency on the cluster or Pocket-ID).
-      # Router port forwarding: TCP 8443 and UDP 41641 -> nuc1.
-      headscale = {
-        name = "hs.abe.lc";
-        baseDomain = "ts.abe.lc";
-        oidcClientId = "TODO";   # Pocket-ID client "headscale"
-      };
+      # Tailscale (control server: Headscale in the cluster, hs.abe.lc) for everyday use, nuc1
+      # as subnet router (tailscale.nix); the WireGuard peers below stay as break-glass (no
+      # dependency on the cluster or Pocket-ID).
+      # Router port forwarding: UDP 41641 -> nuc1.
       peers = {
         thinkpad = { address = "10.250.0.2"; publicKey = "Gc7BSQE6PfLylPg2Zam2r3a9aaANhhc0nY07bPNQWS4="; };
         # Friends (cluster admins through Pocket-ID): the Kubernetes API and the internal

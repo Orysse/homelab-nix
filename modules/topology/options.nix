@@ -109,25 +109,6 @@ in
         type = types.listOf types.str;
         description = "Homelab networks reachable through the tunnel (clients' AllowedIPs).";
       };
-      headscale = {
-        name = mkOption {
-          type = types.str;
-          description = "Public name of the Headscale control server (resolves to the router's IP).";
-        };
-        port = mkOption {
-          type = types.port;
-          default = 8443;
-          description = "HTTPS port of the control server (router TCP forward to vpn.host).";
-        };
-        baseDomain = mkOption {
-          type = types.str;
-          description = "MagicDNS suffix of the tailnet (must not contain `name`).";
-        };
-        oidcClientId = mkOption {
-          type = types.str;
-          description = "Pocket-ID client of Headscale (its secret is a sops secret of the host).";
-        };
-      };
       peers = mkOption {
         description = "Allowed clients: tunnel IP and public key.";
         type = types.attrsOf (types.submodule {
