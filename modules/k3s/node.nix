@@ -51,8 +51,11 @@ in
             "--tls-san=${node}.local"
             "--write-kubeconfig-mode=0600"
             "--secrets-encryption"
-            # Pod traffic between nodes encrypted and authenticated (VXLAN is neither).
-            "--flannel-backend=wireguard-native"
+            # Network and services by Cilium (cilium.nix): no flannel, no kube-proxy, no k3s
+            # network policy controller.
+            "--flannel-backend=none"
+            "--disable-network-policy"
+            "--disable-kube-proxy"
             # On the host (/persist is a virtiofs share): survives the VM.
             "--etcd-snapshot-dir=/persist/etcd-snapshots"
             # People: OIDC tokens from Pocket-ID (structured config below, several clients).
@@ -125,7 +128,8 @@ in
 
       # https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
       # Open to the LAN: SSH, the API (kubectl from the LAN and the VPN), Traefik.
-      # Nodes only: etcd, kubelet, MetalLB memberlist (7946), flannel WireGuard (51820).
+      # Nodes only: etcd, kubelet, MetalLB memberlist (7946), Cilium health (4240), Hubble
+      # peers (4244), Cilium WireGuard (51871).
       networking.firewall =
         let
           nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
@@ -136,9 +140,12 @@ in
         {
           allowedTCPPorts = [ 80 443 ] ++ lib.optionals isServer [ 6443 ];
           extraCommands = fromNodes "tcp" "10250" + fromNodes "tcp" "7946" + fromNodes "udp" "7946"
-            + fromNodes "udp" "51820"
+            + fromNodes "tcp" "4240" + fromNodes "tcp" "4244" + fromNodes "udp" "51871"
             + lib.optionalString isServer (fromNodes "tcp" "2379:2380");
-          trustedInterfaces = [ "cni0" "flannel-wg" ];
+          # Pod-side interfaces (lxc*), Cilium's host and WireGuard devices.
+          trustedInterfaces = [ "lxc+" "cilium_host" "cilium_net" "cilium_wg0" ];
+          # Pod traffic arrives on interfaces whose routes point elsewhere (eBPF routing).
+          checkReversePath = false;
         };
     };
 }

@@ -70,7 +70,7 @@ in
       networking.firewall.allowedUDPPorts = [ 5353 ];
 
       systemd.network.networks."19-cni-unmanaged" = {
-        matchConfig.Name = [ "veth*" "cni0" "flannel*" ];
+        matchConfig.Name = [ "veth*" "lxc*" "cilium_*" ];
         linkConfig.Unmanaged = true;
       };
     };
