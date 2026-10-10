@@ -10,7 +10,7 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 
 - Phase 1 (host + microVMs) done, gates G0–G6 validated on 2026-10-07.
 - k3s: `kube-1` server (etcd, `clusterInit`), `kube-2`/`kube-3` agents (`modules/k3s/`).
-- Cluster content (MetalLB, Traefik, cert-manager, storage class, OpenBao, Pocket-ID,
+- Cluster content (MetalLB, Traefik, cert-manager, storage class, OpenBao, Pocket-ID, Umami,
   Headlamp, monitoring collectors, Grafana, apps) lives in the `homelab-cluster` repository, applied by Flux. Do not
   redeclare it here.
 - Entry point: Traefik on `192.168.1.240` (MetalLB), apps on `<app>.abe.lc`, wildcard
@@ -29,6 +29,8 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 - Identity (D25): Pocket-ID at `auth.abe.lc`; the k3s API server accepts its tokens
   (topology `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.abe.lc`.
   Friends are cluster admins; API audit log (people only) in VictoriaLogs.
+- Network (D27): Cilium (native routing, kube-proxy replacement, WireGuard, Hubble at
+  `hubble.int.abe.lc`), installed by the base (`k3s/cilium.nix`).
 - Updates (D26): Renovate PRs (weekly `flake.lock`), CI runs `nix flake check`, deploy by hand.
   k3s pinned to `k3s_1_36`, PostgreSQL to 18.
 - nuc1 PSU is 65 W: CPU capped at 25 W. Deploy host changes in small steps. NIC offloads off

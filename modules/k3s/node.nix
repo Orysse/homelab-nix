@@ -28,6 +28,9 @@ in
       systemd.tmpfiles.settings."10-k3s-etc" = {
         "/var/lib/rancher/etc".d.mode = "0755";
         "/etc/rancher"."L+".argument = "/var/lib/rancher/etc";
+      } // lib.optionalAttrs isServer {
+        # k3s does not create it, and silently skips scheduled snapshots without it.
+        "/persist/etcd-snapshots".d.mode = "0700";
       };
 
       services.k3s = {
