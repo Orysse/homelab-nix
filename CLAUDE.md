@@ -10,25 +10,28 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 
 - Phase 1 (host + microVMs) done, gates G0–G6 validated on 2026-10-07.
 - k3s: `kube-1` server (etcd, `clusterInit`), `kube-2`/`kube-3` agents (`modules/k3s/`).
-- Cluster content (MetalLB, Traefik, cert-manager, storage class, OpenBao, Pocket-ID, Umami,
-  Headlamp, monitoring collectors, Grafana, apps) lives in the `homelab-cluster` repository, applied by Flux. Do not
-  redeclare it here.
+- Cluster content (MetalLB, Traefik, cert-manager, storage class, OpenBao, Pocket-ID,
+  Headscale, Headlamp, CrowdSec, Tetragon, monitoring collectors, Grafana, Homepage, apps)
+  lives in the `homelab-cluster` repository, applied by Flux. Do not redeclare it here.
 - Entry point: Traefik on `192.168.1.240` (MetalLB), apps on `<app>.abe.lc`, wildcard
-  Let's Encrypt certificate. Router port forwarding: TCP 80/443 -> `.240`, UDP 51820 -> nuc1.
+  Let's Encrypt certificate. Router port forwarding: TCP 80/443 -> `.240`, UDP 51820 and 41641 -> nuc1.
 - Secrets: sops-nix on the host (`secrets/nuc1.yaml`); in the cluster, OpenBao for apps and
   sops (Flux) for bootstrap only.
-- Admin VPN: WireGuard on nuc1 (`10.250.0.0/24`). Dynamic DNS (ddclient) runs on nuc1.
+- VPN: Tailscale with Headscale in the cluster (`hs.abe.lc`, Pocket-ID login), nuc1 is the
+  subnet router (`host/tailscale.nix`). WireGuard on nuc1 (`10.250.0.0/24`) stays as
+  break-glass for the owner's laptop. Dynamic DNS (ddclient) runs on nuc1.
   No impermanence on the host (D1 revised).
 - Storage: all persistent data on nuc1 (`/srv/data`, NFS to the nodes, btrbk snapshots), see D21.
   No state inside the VMs.
-- Monitoring (D23): VictoriaMetrics, VictoriaLogs, vmalert, Alertmanager on nuc1 (email alerts
-  through homelab@abe.lc, heartbeat to Healthchecks.io); Grafana at `grafana.int.abe.lc`, in
+- Monitoring (D23): VictoriaMetrics, VictoriaLogs, vmalert, Alertmanager on nuc1 (alerts emailed
+  from homelab@abe.lc to the owner's address, sops `alert-email`; heartbeat to Healthchecks.io); Grafana at `grafana.int.abe.lc`, in
   the cluster. Host rule: D22.
 - Databases (D24): PostgreSQL on nuc1 (`@db`), one per app namespace, passwords owned by
-  OpenBao (in the cluster). Secrets: sops for the platform, OpenBao for apps.
+  OpenBao (in the cluster); read-only cross-app grants in topology `database.readers`. Secrets: sops for the platform, OpenBao for apps.
 - Identity (D25): Pocket-ID at `auth.abe.lc`; the k3s API server accepts its tokens
   (topology `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.abe.lc`.
-  Friends are cluster admins; API audit log (people only) in VictoriaLogs.
+  Groups: `admins` (cluster-admin), `visitors` (read-only); API audit log (people only) in
+  VictoriaLogs.
 - Network (D27): Cilium (native routing, kube-proxy replacement, WireGuard, Hubble at
   `hubble.int.abe.lc`), installed by the base (`k3s/cilium.nix`).
 - Updates (D26): Renovate PRs (weekly `flake.lock`), CI runs `nix flake check`, deploy by hand.
@@ -36,7 +39,7 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 - nuc1 PSU is 65 W: CPU capped at 25 W. Deploy host changes in small steps. NIC offloads off
   (e1000e hang, 2026-10-09).
 - Addressing: `docs/facts.md`. Kubeconfigs (outside the repo): `~/.kube/configs/homelab-oidc.yaml`
-  (Pocket-ID, daily use), `homelab-nix.yaml` (admin certificate, break-glass).
+  (Pocket-ID, daily use; public copy in homelab-cluster `docs/onboarding/kubeconfig.yaml`), `homelab-nix.yaml` (admin certificate, break-glass).
 
 Update this section when the state changes.
 
@@ -45,7 +48,7 @@ Update this section when the state changes.
 1. `docs/00-architecture.md` — principles, data model, layers.
 2. `docs/03-decisions-and-open-questions.md` — decisions taken and open questions.
 3. `docs/04-workloads.md` — boundary between this repository and `homelab-cluster`.
-4. `docs/01-phase1-provisioning.md`, `docs/02-phase2-k3s-preview.md` — historical plans.
+4. The original phase 1 and phase 2 plans are in git history (removed 2026-10-11).
 
 ## Non-negotiable principles
 

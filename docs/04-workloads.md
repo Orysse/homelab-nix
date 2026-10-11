@@ -1,7 +1,8 @@
 # Cluster content: base / GitOps boundary
 
 This repository (the base) stops at a running k3s cluster with **Flux installed**. Everything
-that runs inside the cluster — MetalLB, Traefik configuration, cert-manager, storage class, monitoring collectors and Grafana, apps —
+that runs inside the cluster — MetalLB, Traefik configuration, cert-manager, storage class, OpenBao, Pocket-ID, Headscale,
+monitoring collectors and Grafana, apps —
 lives in the `homelab-cluster` repository and is applied by Flux on every `git push`.
 
 Reason (D14): manifests declared in Nix are part of the `kube-1` VM configuration; every app
@@ -33,6 +34,7 @@ values the cluster needs in `flux-system/cluster-vars`, which Flux substitutes:
 | `cluster.ingress.internalAddress` | `${INTERNAL_ADDRESS}` |
 | `cluster.hosts.<storage.host>.address`, `cluster.storage.path` | `${NFS_SERVER}`, `${NFS_SHARE}` |
 | `cluster.hosts.<monitoring.host>.address` | `${MONITORING_ADDRESS}` |
+| `cluster.hosts.<database.host>.address` | `${DATABASE_ADDRESS}` |
 
 Changing the domain = one line in the topology + `nixos-rebuild`.
 
