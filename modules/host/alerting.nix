@@ -1,8 +1,7 @@
 # Alerting on the monitoring host, below the cluster: it still fires when the cluster is
 # down (D22). Standard split: vmalert evaluates the rules (_alert-rules.nix) against
 # VictoriaMetrics, Alertmanager groups, silences and sends them by email through the
-# homelab@<domain> mailbox and to the phone through ntfy (ntfy.nix, topic "homelab"; critical
-# ones at high priority). Grafana (in the cluster) only displays them.
+# homelab@<domain> mailbox. Grafana (in the cluster) only displays them.
 #   vmalert       127.0.0.1:8880
 #   Alertmanager  :9093  (the nodes may read it: Grafana's Alertmanager data source)
 #   Heartbeat     Watchdog -> Healthchecks.io every minute; it emails if the pings stop
@@ -16,17 +15,6 @@ in
       domain = cluster.ingress.domain;
       nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
       mailbox = "homelab@${domain}";
-      creds = "/run/credentials/alertmanager.service";
-      # Email and phone. ntfy formats the message itself (its built-in Alertmanager template).
-      receiver = name: priority: {
-        inherit name;
-        email_configs = [{ to = mailbox; send_resolved = true; }];
-        webhook_configs = [{
-          url = "http://127.0.0.1:2586/homelab?template=alertmanager&priority=${priority}";
-          http_config.authorization = { type = "Bearer"; credentials_file = "${creds}/ntfy-token"; };
-          send_resolved = true;
-        }];
-      };
     in
     lib.mkIf (cluster.monitoring.host == config.networking.hostName) {
       services.vmalert.instances.homelab = {
@@ -53,10 +41,10 @@ in
             smtp_smarthost = "smtp.mail.ovh.net:465";   # implicit TLS
             smtp_from = "Homelab <${mailbox}>";
             smtp_auth_username = mailbox;
-            smtp_auth_password_file = "${creds}/smtp-password";
+            smtp_auth_password_file = "/run/credentials/alertmanager.service/smtp-password";
           };
           route = {
-            receiver = "default";
+            receiver = "email";
             group_by = [ "alertname" "host" "namespace" ];
             group_wait = "30s";
             group_interval = "5m";
@@ -69,22 +57,20 @@ in
               group_wait = "0s";
               group_interval = "1m";
               repeat_interval = "1m";
-            }
-            {
-              matchers = [ "severity = critical" ];
-              receiver = "critical";
             }];
           };
           receivers = [
             {
               name = "heartbeat";
               webhook_configs = [{
-                url_file = "${creds}/heartbeat-url";
+                url_file = "/run/credentials/alertmanager.service/heartbeat-url";
                 send_resolved = false;
               }];
             }
-            (receiver "default" "default")
-            (receiver "critical" "high")
+            {
+              name = "email";
+              email_configs = [{ to = mailbox; send_resolved = true; }];
+            }
           ];
           # When the cluster sends nothing, its own alerts are noise: only the cause (and the
           # host alerts, which explain it) get through.
@@ -99,7 +85,6 @@ in
         [
         "smtp-password:${config.sops.secrets.smtp-password.path}"
         "heartbeat-url:${config.sops.secrets.heartbeat-url.path}"
-        "ntfy-token:${config.sops.secrets.ntfy-alertmanager-token.path}"
       ];
 
       networking.firewall.extraCommands = lib.concatMapStrings

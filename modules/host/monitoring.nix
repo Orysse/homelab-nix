@@ -43,7 +43,6 @@ in
           victorialogs = 9428;
           vmalert = 8880;
           alertmanager = 9093;
-          ntfy = 9095;
         };
       };
 
@@ -70,7 +69,7 @@ in
           enabledCollectors = [ "systemd" ];
           extraFlags = [
             # Units worth watching: the VMs and what the host serves.
-            "--collector.systemd.unit-include=(microvm.*|sshd|systemd-networkd|ddclient|nfs-server|btrbk-.*|victoria.*|vmalert-.*|alertmanager|ntfy-sh|systemd-journal-upload)\\.(service|timer)"
+            "--collector.systemd.unit-include=(microvm.*|sshd|systemd-networkd|ddclient|nfs-server|btrbk-.*|victoria.*|vmalert-.*|alertmanager|systemd-journal-upload)\\.(service|timer)"
           ];
         };
         wireguard = {
