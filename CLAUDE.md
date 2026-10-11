@@ -89,8 +89,8 @@ Update this section when the state changes.
 - **No secrets in the repository** (private keys, passwords, tokens) other than sops-encrypted
   files. *Public* SSH keys are fine.
 - Deploy hosts with deploy-rs: it rolls back on its own if the host stops answering after
-  activation (magic rollback, 30 s), so a network change cannot lock you out. nuc1's PSU is
-  weak: deploy big host changes in small steps.
+  activation (magic rollback, 30 s), so a network change cannot lock you out. Restarting
+  a VM restarts its node: one at a time, and watch the cluster in between.
 - When information is missing (network, hardware…), ask the owner rather than inventing it.
 
 ## Useful commands
