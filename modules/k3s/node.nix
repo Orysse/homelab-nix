@@ -67,6 +67,15 @@ in
             # VictoriaLogs (microvm-guest.nix).
             "--kube-apiserver-arg=audit-policy-file=/etc/kubernetes/audit-policy.yaml"
             "--kube-apiserver-arg=audit-log-path=-"
+            # The control plane shares this node with pods. Without a reservation, pods ate its
+            # memory, the kernel thrashed (no swap), etcd stalled and k3s lost its leases in a
+            # loop (2026-10-11). Reserve room for k3s itself, evict pods before thrashing, and
+            # steer apps to the agents (the taint is only applied when the node registers:
+            # `kubectl taint` it by hand on an existing node).
+            "--kubelet-arg=kube-reserved=cpu=500m,memory=1Gi"
+            "--kubelet-arg=system-reserved=cpu=200m,memory=300Mi"
+            "--kubelet-arg=eviction-hard=memory.available<300Mi"
+            "--node-taint=node-role.kubernetes.io/control-plane:PreferNoSchedule"
           ]
           ++ lib.optional (spec.address != null) "--tls-san=${spec.address}"
         );
