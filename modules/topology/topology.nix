@@ -83,7 +83,7 @@
 
     # mem in MB. Never exactly 2048: QEMU hangs (microvm.nix#171).
     nodes = {
-      kube-1 = { host = "nuc1"; address = "192.168.1.211"; role = "server"; mem = 4000; vcpu = 2; };
+      kube-1 = { host = "nuc1"; address = "192.168.1.211"; role = "server"; mem = 4500; vcpu = 3; };   # control plane + etcd: lost its leases at 4000 MB / 2 vCPU (2026-10-11)
       kube-2 = { host = "nuc1"; address = "192.168.1.212"; role = "agent"; mem = 3500; vcpu = 2; };
       kube-3 = { host = "nuc1"; address = "192.168.1.213"; role = "agent"; mem = 3500; vcpu = 2; };
     };
