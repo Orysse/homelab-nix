@@ -28,6 +28,17 @@ in
       systemd.tmpfiles.settings."10-k3s-etc" = {
         "/var/lib/rancher/etc".d.mode = "0755";
         "/etc/rancher"."L+".argument = "/var/lib/rancher/etc";
+        # Kubelet config drop-in (k3s writes its own 00-k3s-defaults.conf next to it): swap
+        # is allowed (zram, microvm-guest.nix). LimitedSwap: Burstable pods may swap in
+        # proportion to their memory request; Guaranteed pods and system-critical ones never.
+        "/var/lib/rancher/k3s/agent/etc/kubelet.conf.d".d.mode = "0700";
+        "/var/lib/rancher/k3s/agent/etc/kubelet.conf.d/90-swap.conf"."L+".argument =
+          toString (pkgs.writeText "kubelet-swap.conf" (builtins.toJSON {
+            apiVersion = "kubelet.config.k8s.io/v1beta1";
+            kind = "KubeletConfiguration";
+            failSwapOn = false;
+            memorySwap.swapBehavior = "LimitedSwap";
+          }));
       } // lib.optionalAttrs isServer {
         # k3s does not create it, and silently skips scheduled snapshots without it.
         "/persist/etcd-snapshots".d.mode = "0700";

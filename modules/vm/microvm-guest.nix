@@ -73,5 +73,14 @@ in
         matchConfig.Name = [ "veth*" "lxc*" "cilium_*" ];
         linkConfig.Unmanaged = true;
       };
+
+      # Compressed swap in RAM: cold pages are squeezed instead of the kernel thrashing when
+      # memory runs out (the nodes collapsed one after the other without swap, 2026-10-11).
+      # kubelet allows it (k3s/node.nix, LimitedSwap).
+      zramSwap = {
+        enable = true;
+        algorithm = "zstd";
+        memoryPercent = 50;
+      };
     };
 }

@@ -28,18 +28,9 @@ in
         # Not "en*": a USB adapter (cdc_ncm) would be bridged too.
         homelab.lanInterface = "eno1";
 
-        # 65 W power supply (Intel ships 90 W with the NUC10i7FNH): CPU bursts (PL2 45 W in the
-        # BIOS) plus the rest of the board reach ~65 W and the PSU cuts out (seen twice during a
-        # switch, 2026-10-09). PL2 = PL1 = 25 W: same sustained power, no spikes.
-        services.undervolt = {
-          enable = true;
-          p1 = { limit = 25; window = 28; };
-          p2 = { limit = 25; window = 0.00244; };
-          useTimer = true;   # re-applied periodically, in case the firmware resets it
-        };
-        # The timer rewrites the power-limit MSR every ~30 s; without this the kernel logs a
-        # warning each time.
-        boot.kernelParams = [ "msr.allow_writes=on" ];
+        # CPU power limits: the BIOS's (PL2 45 W). They were capped at 25 W in software while
+        # nuc1 ran on a 65 W supply, which cut out on CPU bursts (2026-10-09); a new supply
+        # replaced it on 2026-10-11.
 
         # Intel I219 (e1000e) "Detected Hardware Unit Hang" under load (NFS, VM traffic on the
         # bridge): the NIC stopped for good on 2026-10-09 and nuc1 went offline for 20 minutes.

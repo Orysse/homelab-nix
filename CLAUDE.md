@@ -36,8 +36,11 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
   `hubble.int.abe.lc`), installed by the base (`k3s/cilium.nix`).
 - Updates (D26): Renovate PRs (weekly `flake.lock`), CI runs `nix flake check`, deploy by hand.
   k3s pinned to `k3s_1_36`, PostgreSQL to 18.
-- nuc1 PSU is 65 W: CPU capped at 25 W. Deploy host changes in small steps. NIC offloads off
+- nuc1: new PSU since 2026-10-11, BIOS power limits (the 65 W one needed a 25 W software cap). NIC offloads off
   (e1000e hang, 2026-10-09).
+- Memory (collapse of 2026-10-11): zram swap in the VMs, kubelet LimitedSwap, eviction at
+  300 Mi, 1 Gi reserved for the control plane on kube-1 (`k3s/node.nix`). Headroom is small:
+  check real free memory before adding an app; VM sizes stay 4000/3500/3500 MB.
 - Addressing: `docs/facts.md`. Kubeconfigs (outside the repo): `~/.kube/configs/homelab-oidc.yaml`
   (Pocket-ID, daily use; public copy in homelab-cluster `docs/onboarding/kubeconfig.yaml`), `homelab-nix.yaml` (admin certificate, break-glass).
 
