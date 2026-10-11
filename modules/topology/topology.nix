@@ -38,7 +38,8 @@
 
     database = {
       host = "nuc1";
-      databases = [ "pocket-id" "monitoring" "umami" "headscale" ];
+      databases = [ "pocket-id" "monitoring" "umami" "headscale" "matrix" ];
+      collateC = [ "matrix" ];   # Synapse refuses any other collation
       # Grafana (its user "monitoring") shows Umami's stats: the analytics tables only, not
       # Umami's users or API keys.
       readers = [

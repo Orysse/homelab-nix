@@ -13,6 +13,7 @@ in
     let
       nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
       dbs = cluster.database.databases;
+      cdbs = cluster.database.collateC;
       psql = "${config.services.postgresql.package}/bin/psql";
     in
     lib.mkIf (cluster.database.host == config.networking.hostName) {
@@ -21,9 +22,10 @@ in
         package = pkgs.postgresql_18;
         enableTCPIP = true;
         settings.password_encryption = "scram-sha-256";
-        ensureDatabases = dbs;
+        # The C-collation databases are created below (ensureDatabases cannot set a locale).
+        ensureDatabases = lib.subtractLists cdbs dbs;
         ensureUsers =
-          map (db: { name = db; ensureDBOwnership = true; }) dbs
+          map (db: { name = db; ensureDBOwnership = !(lib.elem db cdbs); }) dbs
           ++ [{ name = "openbao"; ensureClauses = { login = true; createrole = true; }; }];
         # Local admin through the unix socket (peer); the nodes with a password only.
         authentication = lib.mkForce (''
@@ -56,6 +58,23 @@ in
           ${lib.concatMapStrings (db: ''GRANT "${db}" TO openbao WITH ADMIN OPTION;'' + "\n") dbs}
           SQL
         '';
+      };
+
+      # Databases that need the C collation, owned by their user like the others.
+      systemd.services.postgresql-collate-c = lib.mkIf (cdbs != [ ]) {
+        description = "Create the PostgreSQL databases that need the C collation";
+        after = [ "postgresql-setup.service" ];
+        requires = [ "postgresql-setup.service" ];
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = { Type = "oneshot"; RemainAfterExit = true; User = "postgres"; };
+        # \gexec runs the CREATE only when the SELECT returns it (database missing).
+        script = lib.concatMapStrings (db: ''
+          ${psql} -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT format('CREATE DATABASE %I OWNER %I TEMPLATE template0 ENCODING %L LC_COLLATE %L LC_CTYPE %L',
+                        '${db}', '${db}', 'UTF8', 'C', 'C')
+          WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = '${db}')\gexec
+          SQL
+        '') cdbs;
       };
 
       # Read-only access across apps (topology database.readers): listed tables only. Run
