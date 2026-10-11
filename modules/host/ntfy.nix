@@ -59,8 +59,11 @@ in
       };
       # DynamicUser: systemd hands it copies of the root-only certificate files.
       systemd.services.ntfy-sh = {
-        wants = [ "acme-finished-${name}.target" ];
-        after = [ "acme-finished-${name}.target" ];
+        # acme-<name> puts a certificate in place (self-signed until the real one is issued);
+        # the order itself runs after ntfy is up, then reloads it.
+        wants = [ "acme-${name}.service" ];
+        after = [ "acme-${name}.service" ];
+        before = [ "acme-order-renew-${name}.service" ];
         serviceConfig.LoadCredential = [
           "cert.pem:/var/lib/acme/${name}/fullchain.pem"
           "key.pem:/var/lib/acme/${name}/key.pem"
