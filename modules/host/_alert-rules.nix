@@ -21,7 +21,7 @@ in
           "{{ $labels.host }} restarted"
           "{{ $labels.host }} booted less than 15 minutes ago. Unplanned? Check the power supply, then `journalctl -b -1 | tail`.")
         (alert "HostUnitInactive"
-          "node_systemd_unit_state{job=\"node\",state=\"active\",name=~\"microvm@.+|microvm-virtiofsd@.+|sshd.service|systemd-networkd.service|nfs-server.service|victoria.+|vmalert.+|alertmanager.service|ddclient.timer|btrbk-data.timer\"} == 0"
+          "node_systemd_unit_state{job=\"node\",state=\"active\",name=~\"microvm@.+|microvm-virtiofsd@.+|sshd.service|systemd-networkd.service|nfs-server.service|victoria.+|vmalert.+|alertmanager.service|ntfy-sh.service|ddclient.timer|btrbk-data.timer\"} == 0"
           "5m" "critical"
           "{{ $labels.host }}: {{ $labels.name }} is not active"
           "`systemctl status {{ $labels.name }}` and `journalctl -u {{ $labels.name }} -n 50` on {{ $labels.host }}.")
@@ -129,8 +129,20 @@ in
       ];
     }
     {
-      # Always firing. Alertmanager routes it to nobody for now; later to an external
-      # heartbeat that alerts when it STOPS (monitoring host dead, power cut).
+      name = "alerting";
+      rules = [
+        # Each alert goes out by email AND ntfy: when one of them fails, this one still
+        # arrives through the other.
+        (alert "NotificationsFailing"
+          "sum by (integration) (increase(alertmanager_notifications_failed_total{integration=~\"email|webhook\"}[30m])) > 0"
+          "0m" "warning"
+          "Alertmanager failed to send {{ $labels.integration }} notifications"
+          "email: the OVH mailbox (password, SMTP). webhook: ntfy (`systemctl status ntfy-sh`) or Healthchecks.io. `journalctl -u alertmanager | grep -i notify`.")
+      ];
+    }
+    {
+      # Always firing. Alertmanager pings Healthchecks.io with it every minute, which alerts
+      # when the pings STOP (monitoring host dead, power cut, internet down).
       name = "meta";
       rules = [
         (alert "Watchdog" "vector(1)" "0m" "none"

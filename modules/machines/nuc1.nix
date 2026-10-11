@@ -21,6 +21,7 @@ in
       m.storage
       m.monitoring
       m.alerting
+      m.ntfy
       m.postgres
       ({ pkgs, ... }: {
         networking.hostName = "nuc1";
