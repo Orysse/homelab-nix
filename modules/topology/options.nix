@@ -63,11 +63,6 @@ in
         default = [ ];
         description = "One database and one user per entry, named after the app's Kubernetes namespace. OpenBao manages the users' passwords.";
       };
-      collateC = mkOption {
-        type = types.listOf types.str;
-        default = [ ];
-        description = "Entries of `databases` created with the C collation and ctype (Synapse requires it; the default is en_US.UTF-8).";
-      };
       readers = mkOption {
         type = types.listOf (types.submodule {
           options = {
