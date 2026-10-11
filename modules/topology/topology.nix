@@ -39,6 +39,11 @@
     database = {
       host = "nuc1";
       databases = [ "pocket-id" "monitoring" "umami" "headscale" ];
+      # Grafana (its user "monitoring") shows Umami's stats: the analytics tables only, not
+      # Umami's users or API keys.
+      readers = [
+        { role = "monitoring"; database = "umami"; tables = [ "website" "website_event" "session" ]; }
+      ];
     };
 
     # Router port forwarding: UDP 51820 -> nuc1.

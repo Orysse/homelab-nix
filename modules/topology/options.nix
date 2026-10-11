@@ -63,6 +63,17 @@ in
         default = [ ];
         description = "One database and one user per entry, named after the app's Kubernetes namespace. OpenBao manages the users' passwords.";
       };
+      readers = mkOption {
+        type = types.listOf (types.submodule {
+          options = {
+            role = mkOption { type = types.str; description = "Existing app user (one of `databases`)."; };
+            database = mkOption { type = types.str; description = "Database it may read."; };
+            tables = mkOption { type = types.listOf types.str; description = "Tables it may SELECT (only these: never a whole schema)."; };
+          };
+        });
+        default = [ ];
+        description = "Read-only access of one app to some tables of another app's database.";
+      };
     };
 
     oidc = {

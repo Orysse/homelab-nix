@@ -58,6 +58,23 @@ in
         '';
       };
 
+      # Read-only access across apps (topology database.readers): listed tables only. Run
+      # again at every switch; GRANT is idempotent.
+      systemd.services.postgresql-readers = lib.mkIf (cluster.database.readers != [ ]) {
+        description = "Grant apps read-only access to other apps' tables";
+        after = [ "postgresql-setup.service" ];
+        requires = [ "postgresql-setup.service" ];
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = { Type = "oneshot"; RemainAfterExit = true; User = "postgres"; };
+        script = lib.concatMapStrings (r: ''
+          ${psql} -v ON_ERROR_STOP=1 -d '${r.database}' <<'SQL'
+          GRANT CONNECT ON DATABASE "${r.database}" TO "${r.role}";
+          GRANT USAGE ON SCHEMA public TO "${r.role}";
+          GRANT SELECT ON ${lib.concatMapStringsSep ", " (t: ''public."${t}"'') r.tables} TO "${r.role}";
+          SQL
+        '') cluster.database.readers;
+      };
+
       networking.firewall.extraCommands = lib.concatMapStrings
         (ip: "iptables -A nixos-fw -p tcp -s ${ip} --dport 5432 -j nixos-fw-accept\n")
         nodeIPs;
