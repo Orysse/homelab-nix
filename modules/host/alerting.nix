@@ -1,7 +1,9 @@
 # Alerting on the monitoring host, below the cluster: it still fires when the cluster is
 # down (D22). Standard split: vmalert evaluates the rules (_alert-rules.nix) against
 # VictoriaMetrics, Alertmanager groups, silences and sends them by email through the
-# homelab@<domain> mailbox. Grafana (in the cluster) only displays them.
+# homelab@<domain> mailbox, to the owner's own address (sops: alert-email; the repository is
+# public, and the mailbox drops mail sent to itself). Grafana (in the cluster) only displays
+# them.
 #   vmalert       127.0.0.1:8880
 #   Alertmanager  :9093  (the nodes may read it: Grafana's Alertmanager data source)
 #   Heartbeat     Watchdog -> Healthchecks.io every minute; it emails if the pings stop
@@ -33,9 +35,12 @@ in
 
       sops.secrets.smtp-password = { };
       sops.secrets.heartbeat-url = { };   # Healthchecks.io ping URL (anyone with it can ping)
+      sops.secrets.alert-email = { };
+      sops.templates."alertmanager.env".content = "ALERT_EMAIL=${config.sops.placeholder.alert-email}";
       services.prometheus.alertmanager = {
         enable = true;
         port = 9093;
+        environmentFile = config.sops.templates."alertmanager.env".path;   # $ALERT_EMAIL below
         configuration = {
           global = {
             smtp_smarthost = "smtp.mail.ovh.net:465";   # implicit TLS
@@ -69,7 +74,7 @@ in
             }
             {
               name = "email";
-              email_configs = [{ to = mailbox; send_resolved = true; }];
+              email_configs = [{ to = "$ALERT_EMAIL"; send_resolved = true; }];
             }
           ];
           # When the cluster sends nothing, its own alerts are noise: only the cause (and the
