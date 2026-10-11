@@ -28,7 +28,8 @@ in
         # Not "en*": a USB adapter (cdc_ncm) would be bridged too.
         homelab.lanInterface = "eno1";
 
-        # CPU power limits: the BIOS's (PL2 45 W). They were capped at 25 W in software while
+        # CPU power limits: the BIOS defaults (PL1 30 W, PL2 64 W, tau 28 s). They were capped at
+        # 25 W in software while
         # nuc1 ran on a 65 W supply, which cut out on CPU bursts (2026-10-09); a new supply
         # replaced it on 2026-10-11.
 
