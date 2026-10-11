@@ -29,9 +29,8 @@ in
         homelab.lanInterface = "eno1";
 
         # CPU power limits: the BIOS defaults (PL1 30 W, PL2 64 W, tau 28 s). They were capped at
-        # 25 W in software while
-        # nuc1 ran on a 65 W supply, which cut out on CPU bursts (2026-10-09); a new supply
-        # replaced it on 2026-10-11.
+        # 25 W in software while nuc1 ran on a 65 W supply, which cut out on CPU bursts
+        # (2026-10-09); a new supply replaced it on 2026-10-11.
 
         # Intel I219 (e1000e) "Detected Hardware Unit Hang" under load (NFS, VM traffic on the
         # bridge): the NIC stopped for good on 2026-10-09 and nuc1 went offline for 20 minutes.
