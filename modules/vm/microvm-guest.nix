@@ -18,6 +18,9 @@ in
       microvm = {
         hypervisor = "qemu";
         inherit (spec) mem vcpu;
+        # Free page reporting (topology nodes.<n>.balloon): the RAM the guest frees goes back
+        # to the host; without it, a page the guest touched stays the VM's for good.
+        inherit (spec) balloon;
 
         interfaces = [{
           type = "tap";

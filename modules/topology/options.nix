@@ -178,6 +178,11 @@ in
             description = "RAM in MB (reserved on the host).";
           };
           vcpu = mkOption { type = types.ints.positive; };
+          balloon = mkOption {
+            type = types.bool;
+            default = false;
+            description = "virtio-balloon with free page reporting: the guest hands the memory it frees back to the host (microvm.balloon).";
+          };
           dataDisk = mkOption {
             type = types.ints.positive;
             default = 20480;
