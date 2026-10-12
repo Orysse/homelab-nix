@@ -65,6 +65,11 @@ in
           # for the system (2026-10-11: nodes thrashed one after the other at ~100 MB free).
           "--kubelet-arg=system-reserved=cpu=200m,memory=300Mi"
           "--kubelet-arg=eviction-hard=memory.available<300Mi"
+          # CIS hardening (k3s guide): kubelet refuses to run if the kernel parameters it
+          # relies on were changed (the k3s module sets them), and idle exec/port-forward
+          # sessions are cut.
+          "--protect-kernel-defaults"
+          "--kubelet-arg=streaming-connection-idle-timeout=5m"
         ]
           ++ lib.optionals isServer (
           [
@@ -84,6 +89,9 @@ in
             # VictoriaLogs (microvm-guest.nix).
             "--kube-apiserver-arg=audit-policy-file=/etc/kubernetes/audit-policy.yaml"
             "--kube-apiserver-arg=audit-log-path=-"
+            # Pod security for every namespace without its own label: baseline enforced,
+            # restricted reported (admission config below).
+            "--kube-apiserver-arg=admission-control-config-file=/etc/kubernetes/pod-security.yaml"
             # The control plane shares this node with pods: without a reservation, pods ate its
             # memory, etcd stalled and k3s lost its leases in a loop (2026-10-11). Reserve room
             # for k3s itself and steer apps to the agents (the taint is only applied when the
@@ -115,6 +123,34 @@ in
             claimMappings = {
               username = { claim = "preferred_username"; prefix = "oidc:"; };
               groups = { claim = "groups"; prefix = "oidc:"; };
+            };
+          }];
+        };
+      };
+
+      # Default pod security: a new namespace is baseline at least (no privileged pods, no host
+      # namespaces or paths) unless labelled otherwise; restricted shows up as warnings and in
+      # the audit log. Exempt: the namespaces whose pods need the host (Cilium, Tetragon, CSI,
+      # MetalLB speakers, CrowdSec agents). monitoring is labelled privileged in
+      # homelab-cluster.
+      environment.etc."kubernetes/pod-security.yaml" = lib.mkIf isServer {
+        text = builtins.toJSON {
+          apiVersion = "apiserver.config.k8s.io/v1";
+          kind = "AdmissionConfiguration";
+          plugins = [{
+            name = "PodSecurity";
+            configuration = {
+              apiVersion = "pod-security.admission.config.k8s.io/v1";
+              kind = "PodSecurityConfiguration";
+              defaults = {
+                enforce = "baseline"; enforce-version = "latest";
+                audit = "restricted"; audit-version = "latest";
+                warn = "restricted"; warn-version = "latest";
+              };
+              exemptions = {
+                usernames = [ ]; runtimeClasses = [ ];
+                namespaces = [ "kube-system" "crowdsec" "metallb-system" ];
+              };
             };
           }];
         };
