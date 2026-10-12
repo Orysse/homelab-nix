@@ -18,7 +18,7 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 - Secrets: sops-nix on the host (`secrets/nuc1.yaml`); in the cluster, OpenBao for apps and
   sops (Flux) for bootstrap only.
 - VPN: Tailscale with Headscale in the cluster (`hs.abe.lc`, Pocket-ID login), nuc1 is the
-  subnet router (`host/tailscale.nix`). WireGuard on nuc1 (`10.250.0.0/24`) stays as
+  subnet router and an exit node for admins (`host/tailscale.nix`). WireGuard on nuc1 (`10.250.0.0/24`) stays as
   break-glass for the owner's laptop. Dynamic DNS (ddclient) runs on nuc1.
   No impermanence on the host (D1 revised).
 - Storage: all persistent data on nuc1 (`/srv/data`, NFS to the nodes, btrbk snapshots), see D21.
