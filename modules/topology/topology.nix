@@ -82,9 +82,9 @@
 
     # mem in MB. Never exactly 2048: QEMU hangs (microvm.nix#171).
     nodes = {
-      kube-1 = { host = "nuc1"; address = "192.168.1.211"; role = "server"; mem = 4000; vcpu = 2; };   # control plane + etcd; 1 GB kept for k3s (k3s/node.nix)
-      kube-2 = { host = "nuc1"; address = "192.168.1.212"; role = "agent"; mem = 3500; vcpu = 2; };
-      kube-3 = { host = "nuc1"; address = "192.168.1.213"; role = "agent"; mem = 3500; vcpu = 2; };
+      kube-1 = { host = "nuc1"; address = "192.168.1.211"; role = "server"; mem = 4000; vcpu = 2; balloon = true; };   # control plane + etcd; 1 GB kept for k3s (k3s/node.nix)
+      kube-2 = { host = "nuc1"; address = "192.168.1.212"; role = "agent"; mem = 3500; vcpu = 2; balloon = true; };
+      kube-3 = { host = "nuc1"; address = "192.168.1.213"; role = "agent"; mem = 3500; vcpu = 2; balloon = true; };
     };
   };
 }
