@@ -76,7 +76,7 @@ in
           enabledCollectors = [ "systemd" ];
           extraFlags = [
             # Units worth watching: the VMs and what the host serves.
-            "--collector.systemd.unit-include=(microvm.*|sshd|systemd-networkd|ddclient|nfs-server|btrbk-.*|victoria.*|vmalert-.*|alertmanager|systemd-journal-upload)\\.(service|timer)"
+            "--collector.systemd.unit-include=(microvm.*|sshd|systemd-networkd|ddclient|nfs-server|btrbk-.*|victoria.*|vmalert-.*|alertmanager|trivy-scan|systemd-journal-upload)\\.(service|timer)"
           ];
         };
         wireguard = {

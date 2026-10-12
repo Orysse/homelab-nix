@@ -21,7 +21,7 @@ in
           "{{ $labels.host }} restarted"
           "{{ $labels.host }} booted less than 15 minutes ago. Unplanned? Check the power supply, then `journalctl -b -1 | tail`.")
         (alert "HostUnitInactive"
-          "node_systemd_unit_state{job=\"node\",state=\"active\",name=~\"microvm@.+|microvm-virtiofsd@.+|sshd.service|systemd-networkd.service|nfs-server.service|victoria.+|vmalert.+|alertmanager.service|ddclient.timer|btrbk-data.timer\"} == 0"
+          "node_systemd_unit_state{job=\"node\",state=\"active\",name=~\"microvm@.+|microvm-virtiofsd@.+|sshd.service|systemd-networkd.service|nfs-server.service|victoria.+|vmalert.+|alertmanager.service|ddclient.timer|btrbk-data.timer|trivy-scan.timer\"} == 0"
           "5m" "critical"
           "{{ $labels.host }}: {{ $labels.name }} is not active"
           "`systemctl status {{ $labels.name }}` and `journalctl -u {{ $labels.name }} -n 50` on {{ $labels.host }}.")
@@ -126,6 +126,29 @@ in
           "10m" "warning"
           "Tetragon is not answering on {{ $labels.node }}"
           "Runtime events are not recorded there. `kubectl -n kube-system logs -l app.kubernetes.io/name=tetragon -c tetragon --tail=50`.")
+      ];
+    }
+    {
+      # Daily Trivy scan of the running images, on the monitoring host (trivy.nix). Only what
+      # can be acted on alerts: a critical vulnerability with a fixed version (update the
+      # image), and the scan itself not running.
+      name = "security";
+      rules = [
+        (alert "ImageCriticalVulnerabilityFixable"
+          "max by (image) (trivy_image_vulnerabilities_fixable{severity=\"CRITICAL\"}) > 0"
+          "0m" "warning"
+          "{{ $labels.image }}: {{ $value }} critical vulnerabilities with a fix available"
+          "Update the image (a Renovate PR may already be waiting). Details on the monitoring host: `trivy image --scanners vuln --severity CRITICAL {{ $labels.image }}`.")
+        (alert "ImageScanFailed"
+          "trivy_image_scan_success == 0"
+          "0m" "warning"
+          "Trivy could not scan {{ $labels.image }}"
+          "Registry rate limit or unreachable, or an unsupported image. `journalctl -u trivy-scan` on the monitoring host.")
+        (alert "ImageScanStale"
+          "time() - trivy_last_run_timestamp_seconds > 2 * 86400"
+          "0m" "warning"
+          "No vulnerability scan for 2 days"
+          "`systemctl status trivy-scan.timer trivy-scan.service` on the monitoring host.")
       ];
     }
     {
