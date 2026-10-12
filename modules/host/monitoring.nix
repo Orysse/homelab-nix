@@ -62,6 +62,13 @@ in
         wants = [ "victorialogs.service" ];
       };
 
+      # Power use (node_rapl_*, for cost estimates): the kernel makes the RAPL energy counters
+      # root-only (a side channel); the node exporter's group may read them. On the NUC10,
+      # "psys" (the whole platform) is the trustworthy zone; "package" reads high.
+      services.udev.extraRules = ''
+        ACTION=="add", SUBSYSTEM=="powercap", KERNEL=="intel-rapl:*", RUN+="${pkgs.coreutils}/bin/chgrp node-exporter /sys%p/energy_uj", RUN+="${pkgs.coreutils}/bin/chmod g+r /sys%p/energy_uj"
+      '';
+
       services.prometheus.exporters = {
         node = {
           enable = true;
