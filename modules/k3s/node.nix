@@ -25,6 +25,17 @@ in
         fsType = "ext4";
       }];
 
+      # The kernel parameters kubelet expects with --protect-kernel-defaults (it no longer sets
+      # them itself, and refuses to start otherwise; the microVM boots with kernel.panic=-1).
+      boot.kernel.sysctl = {
+        "vm.overcommit_memory" = 1;
+        "vm.panic_on_oom" = 0;
+        "kernel.panic" = 10;
+        "kernel.panic_on_oops" = 1;
+        "kernel.keys.root_maxkeys" = 1000000;
+        "kernel.keys.root_maxbytes" = 25000000;
+      };
+
       systemd.tmpfiles.settings."10-k3s-etc" = {
         "/var/lib/rancher/etc".d.mode = "0755";
         "/etc/rancher"."L+".argument = "/var/lib/rancher/etc";
