@@ -181,7 +181,7 @@ in
           balloon = mkOption {
             type = types.bool;
             default = false;
-            description = "virtio-balloon with free page reporting: the guest hands the memory it frees back to the host (microvm.balloon).";
+            description = "virtio-balloon with free page reporting: the guest hands the memory it frees back to the host (microvm.balloon). Tried on kube-3 (2026-10-12): no gain, the guests keep their free RAM as page cache.";
           };
           dataDisk = mkOption {
             type = types.ints.positive;
