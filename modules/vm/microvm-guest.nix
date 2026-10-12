@@ -85,5 +85,9 @@ in
         algorithm = "zstd";
         memoryPercent = 50;
       };
+      # Reclaim page cache before swapping: at the default 60 the kernel kept pushing pods'
+      # memory to zram and pulling it back (~20k pages/s, 160% CPU in the kernel on kube-3,
+      # every probe timing out) while 1.2 GB of inactive file cache sat there (2026-10-12).
+      boot.kernel.sysctl."vm.swappiness" = 10;
     };
 }

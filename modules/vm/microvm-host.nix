@@ -14,7 +14,10 @@ in
 
       microvm.vms = lib.mapAttrs (name: _: {
         autostart = true;
-        restartIfChanged = true;
+        # A deploy does not restart changed VMs: all at once would take the whole cluster
+        # down. Restart them by hand, one at a time (`systemctl restart microvm@<node>`),
+        # watching the cluster in between.
+        restartIfChanged = false;
         specialArgs.node = name;
         config.imports = guestModules;
       }) nodes;
