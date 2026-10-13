@@ -50,9 +50,13 @@ in
           };
           route = {
             receiver = "email";
-            group_by = [ "alertname" "host" "namespace" ];
-            group_wait = "30s";
-            group_interval = "5m";
+            # One digest of everything firing, at most every 15 minutes: one person reads it,
+            # and a cascade must not look like a mass mailing. On 2026-10-11 a collapse sent
+            # 128 mails in a day (20 in one hour, one per alert x host x namespace) and OVH's
+            # anti-spam blocked the mailbox.
+            group_by = [ ];
+            group_wait = "1m";
+            group_interval = "15m";
             repeat_interval = "4h";
             # Watchdog always fires: its notification is a heartbeat to Healthchecks.io, which
             # emails when the pings stop (host down, internet down, alerting pipeline broken).
