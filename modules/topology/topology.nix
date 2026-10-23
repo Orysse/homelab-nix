@@ -38,7 +38,7 @@
 
     database = {
       host = "nuc1";
-      databases = [ "pocket-id" "monitoring" "umami" "headscale" ];
+      databases = [ "pocket-id" "monitoring" "umami" "headscale" "open-webui" ];
       # Grafana (its user "monitoring") shows Umami's stats: the analytics tables only, not
       # Umami's users or API keys.
       readers = [
