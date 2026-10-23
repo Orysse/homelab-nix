@@ -185,7 +185,7 @@ in
           };
           dataDisk = mkOption {
             type = types.ints.positive;
-            default = 20480;
+            default = 32768;
             description = "Size (MiB) of the k3s data volume (/var/lib/rancher), a sparse file on the host.";
           };
         };
