@@ -43,9 +43,9 @@ in
         environmentFile = config.sops.templates."alertmanager.env".path;   # $ALERT_EMAIL below
         configuration = {
           global = {
-            smtp_smarthost = "smtp.mail.ovh.net:465";   # implicit TLS
+            smtp_smarthost = "smtp-relay.brevo.com:587";   # STARTTLS (Brevo relay)
             smtp_from = "Homelab <${mailbox}>";
-            smtp_auth_username = mailbox;
+            smtp_auth_username = "bfaade001@smtp-brevo.com";   # Brevo SMTP login; the key is sops smtp-password
             smtp_auth_password_file = "/run/credentials/alertmanager.service/smtp-password";
           };
           route = {
