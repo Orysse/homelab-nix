@@ -72,40 +72,52 @@ ssh root@192.168.1.200 'free -m; grep MemAvailable /proc/meminfo'
 ```bash
 nix flake check
 nix run .#deploy-rs -- .#nuc1 --ssh-opts="-o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 -o BatchMode=yes"
-ssh root@192.168.1.200 'systemctl start microvm@devbox; systemctl is-active microvm@devbox'
 ```
 
-The deploy does not restart VMs by itself (the repository rule), so the new VM has to be started
-by hand. Never restart or stop `microvm@kube-*` for this. Afterwards, check that the nodes are
+The deploy does not restart VMs by itself (the repository rule) and does not start the new one: that
+is the next section, after the Tailscale key is in place. It creates `/srv/data/devbox/{home,tailscale}`.
+Never restart or stop `microvm@kube-*` for this. Afterwards, check that the nodes are
 unchanged: `kubectl get nodes` (all Ready) and `systemctl is-active microvm@kube-1 microvm@kube-2 microvm@kube-3`.
 
 ## Join the tailnet (once)
 
-The Tailscale login is manual: the pre-auth key is a secret and does not enter the repository.
-The identity then lives in `/srv/data/devbox/tailscale`, so a rebuild or a restart keeps it.
+The join runs as root inside the VM at boot (nobody else could: root cannot log in over SSH and
+`abel` has no sudo). The guest's `tailscaled-autoconnect` unit runs `tailscale up --auth-key
+<contents of /var/lib/tailscale/auth-key> --login-server=https://hs.abe.lc --hostname=devbox
+--accept-dns=false` while the node is not logged in. That path is on the persisted share, so you
+put the key in `/srv/data/devbox/tailscale/auth-key` on nuc1 (root-owned, 0600). The repository holds
+only the path. The node identity then lives in `/srv/data/devbox/tailscale`, so a rebuild or a
+restart keeps it and never reads the file again.
 
 1. Create the key, tagged. The tag comes from the key; Headscale v0.29.5 does not check
-   `tagOwners` when it is used, and it refuses a client that also sends tags of its own.
+   `tagOwners` when it is used, and it rejects a client that also sends tags of its own, so there is
+   no `--advertise-tags` anywhere.
 
    ```bash
    kubectl -n headscale exec deploy/headscale -- headscale users list                # the id of the user `infra`
    kubectl -n headscale exec deploy/headscale -- headscale preauthkeys create --user <infra id> --tags tag:devbox --expiration 1h
    ```
 
-2. Log in to the VM from nuc1 (break-glass path, source `192.168.1.200`) as `abel`, and run:
+2. Write it on nuc1, then start the VM (the key is valid one hour and works once):
 
    ```bash
-   ssh -i ~/.ssh/id_ed25519 root@192.168.1.200          # then, on nuc1:
-   ssh abel@192.168.1.201
-   tailscale up --login-server https://hs.abe.lc --hostname devbox --accept-dns=false --operator=abel --auth-key <key>
+   ssh root@192.168.1.200
+   read -rs KEY && printf '%s\n' "$KEY" | install -m 0600 /dev/stdin /srv/data/devbox/tailscale/auth-key; unset KEY   # paste the key, Enter
+   systemctl start microvm@devbox
    ```
 
-   `abel` can run `tailscale` because the guest sets it as the operator; `--accept-dns=false` and
-   `--operator=abel` repeat what `tailscale set` already applies: `tailscale up` refuses to leave
-   a non-default setting out. No `--advertise-tags`.
-3. On your PC: `tailscale status` lists `devbox`; `headscale nodes list` shows it owned by
-   `tagged-devices` with tag `tag:devbox`. From then on `ssh abel@devbox` works (MagicDNS name
-   `devbox.ts.abe.lc`, or the `100.64.x.y` address of `tailscale status`).
+3. Check, from nuc1 and the cluster: `ssh root@192.168.1.200 'systemctl is-active microvm@devbox'`, and
+   `kubectl -n headscale exec deploy/headscale -- headscale nodes list` shows `devbox`, owned by `tagged-devices`,
+   tag `tag:devbox`, online. On your PC `tailscale status` lists it. Then delete the key file on nuc1,
+   it is spent: `rm /srv/data/devbox/tailscale/auth-key`.
+4. From then on `ssh abel@devbox` works (MagicDNS name `devbox.ts.abe.lc`, or the `100.64.x.y` address of
+   `tailscale status`).
+
+If the VM started before the file existed, `tailscale up` waited for a browser login and systemd killed
+the unit after its start timeout (90 s); the node stays logged out and nothing retries. Write the file and
+restart the VM from nuc1 (`systemctl restart microvm@devbox`; there is no root in the guest to restart one unit).
+The same applies when the node was deleted from Headscale: new key, new file, restart, delete the file.
+Before the tailnet works, reach the VM from the laptop with the jump host (see Break-glass).
 
 SSH client entry, so that `ssh devbox` is enough:
 
@@ -245,7 +257,10 @@ and sh; the settings schema is the one the devbox's own managed settings use, se
 
 ## Break-glass
 
-- From nuc1: `ssh abel@192.168.1.201` (the only LAN source allowed on port 22).
+- From the laptop, at home or before the tailnet works: `ssh -J root@192.168.1.200 abel@192.168.1.201`.
+  `abel`'s keys are the laptop's and the YubiKey's, they are not on nuc1, so a hop through a shell on
+  nuc1 would fail; the jump host opens the TCP connection from nuc1, so the guest sees source
+  `192.168.1.200` (the only LAN source allowed on port 22) while the laptop's key does the login.
 - From the laptop, away from home: the existing Headscale rule gives `group:admins` access to
   `192.168.1.192/26:*` through nuc1's subnet route, which includes `192.168.1.201`; the guest sees
   nuc1's address as the source (Tailscale SNATs subnet-routed traffic), so it lets that in.
@@ -267,10 +282,15 @@ Run it from the laptop and from a second machine on the tailnet.
    to the window; Ctrl-X stops it.
 5. From the laptop, the restricted key writes a row (the call above) and any other command with that key is
    refused: `ssh -i ~/.ssh/devbox-status abel@devbox true` prints `agent-status-remote: rejected: ...`.
-6. Memory cap, in the VM: `systemd-run --user --scope -p MemoryMax=2G python3 -c 'x=bytearray(3<<30)'`.
-   Expected: the process is killed inside the VM; on nuc1 `microvm@kube-*` stay active and
-   `journalctl -k` has no host OOM line. (`MemoryMax` limits RAM; check that zram swap does not let the
-   process through.)
+6. Memory cap, in the VM: `systemd-run --user --scope tail /dev/zero`. No `-p`: the scope has no
+   limit of its own and runs under the user slice, so the slice's `MemoryMax=2G` is what is tested
+   (`systemd-run --user --scope cat /proc/self/cgroup` should show `.../user-1000.slice/user@1000.service/...`).
+   `tail` has no newline to stop at, so it grows without end. Both commands are in the guest (coreutils, systemd);
+   there is no python. Expected: after a few seconds the scope is killed inside the VM (`Killed`, an OOM
+   line in `journalctl -k` of the guest) and the SSH session stays usable; on nuc1 `microvm@kube-*` stay
+   active and `journalctl -k` has no host OOM line. The process can also use the zram swap (about 1.2 GB,
+   zeros compress well), so it may take a while to die; if the guest becomes unusable, the cap is wrong:
+   stop and report.
 7. Survival: `systemctl restart microvm@devbox` on nuc1. After boot the home directory, the Claude Code
    login and the tailnet identity are intact, `agent-status list` shows the former `working` rows as `lost`,
    and `devbox` is still in `tailscale status` without a new key.
@@ -284,18 +304,26 @@ Run it from the laptop and from a second machine on the tailnet.
 
 - `ssh devbox` hangs or times out: `tailscale status` on both sides; the policy not applied yet
   (prerequisite 4); the VM is down (`systemctl is-active microvm@devbox` on nuc1). Use the break-glass path.
-- `tailscale up` says `requested tags [tag:devbox] are invalid or not permitted`: the command carried
-  `--advertise-tags`. Run it again with `--reset` and without that flag; a failed attempt leaves the flag
-  in the node's settings, and `--reset` clears it.
-- `tailscale up` says it requires mentioning all non-default flags: repeat `--accept-dns=false --operator=abel`.
-- `tailscale up` fails with a key error: the key is single use and valid one hour; create a new one.
-- Pre-auth key refused or node untagged: the key must have been created with `--tags tag:devbox`.
+- The VM is up but `devbox` is not in `headscale nodes list`: `ssh -J root@192.168.1.200 abel@192.168.1.201`
+  (break-glass) and `tailscale status` (readable without root); on nuc1, `journalctl -u microvm@devbox`
+  shows the guest console. The usual causes: the key file was missing at boot (see "Join the tailnet"), the key was
+  already used or older than one hour (create a new one, rewrite the file, restart the VM), or the key was created
+  without `--tags tag:devbox` (the node would be a personal node of the key's user, with no ACL to reach it).
+- Do not add `--advertise-tags` anywhere: Headscale rejects a client that sends tags together with a
+  pre-auth key. The tag is the key's.
 - `devbox-secrets` hangs on the login: the tunnel is missing (`ssh -L 8250:localhost:8250 devbox`), or
   Pocket-ID's OpenBao client lacks the callback URL (prerequisite 2).
 - `devbox-secrets` says it could not read a path, or that a value has characters outside
   `A-Za-z0-9_.-`: fix the secret in OpenBao. Nothing is changed when it fails.
 - `permission denied` reading `kv/apps/devbox/...`: Flux has not applied the role and policy yet,
   or you are not in the Pocket-ID group `admins`.
+- Hand-editing `$XDG_RUNTIME_DIR/devbox-env`: lines `KEY=value`, no `export`, no quotes, a value of
+  `[A-Za-z0-9_.-]+`, mode 0600, owned by `abel`. zsh loads only the three known keys as text and
+  `job-triage` reads only `GITHUB_TOKEN`, and it ignores the file if the mode or owner is wrong
+  (the job then fails with `no GitHub credential`). Prefer rerunning `devbox-secrets`.
+- Two rows for one Claude Code session, or none for a headless `claude -p` run: set `AGENT_HOOK_DISABLE=1`
+  in the environment of a `claude` that must not touch the board (the managed hook then does nothing);
+  `job-triage` sets it for its own run, which has a row of its own.
 - A remote report prints `rejected`: read the reason (missing `--machine`, the machine named like the
   devbox, an unquoted character); a login shell's own output on the devbox (zsh startup files) can
   also corrupt a forced command, keep `~/.zshenv` quiet.
@@ -303,7 +331,31 @@ Run it from the laptop and from a second machine on the tailnet.
 
 ## Known limits and follow-ups
 
-Nothing here blocks use; they are what was deferred, so that nobody is surprised.
+Nothing here blocks use; they are what was deferred, so that nobody is surprised. Security-relevant
+items come first, then the rest.
+
+Security-relevant:
+
+- No cap on the number of rows: `agent-status set` has no row-count limit, so a holder of the remote
+  key can flood the board and the status directory.
+- Bidirectional and other format characters pass the display filter (only control characters are
+  refused): a remote row can spoof how its text is drawn in the table.
+- In `agent-status-remote`, `unset BASH_ENV`, `LD_*` and similar protects only the child it starts, not
+  the shell sshd runs before it.
+- The OpenBao policy `devbox` grants `read` on `kv/apps/metadata/devbox/*`; `list` would suffice.
+- The log opened with `<>` can create an empty file if the log is deleted between the path check and the
+  open (it stays under the status directory); the read-only fallback open is not atomic (availability only).
+- The OIDC token and the remote-row overwrite are described below.
+
+Other deferred items, one line each:
+
+- `agent-status` writes a row with a temporary file and `mv` but no `fsync`: a power cut right after a write can lose it.
+- The header of `agent-status-remote.sh` shows a quoting snippet that works in bash only (it fails safely in zsh); use the form in this runbook.
+- `agent-hook` exits early on some events without reading its stdin to the end.
+- The `devbox-ssh-rules` check finds the SSH rule by the substring `dport 22`, which is loose.
+- No negative topology checks for a devbox name that is too long, an unknown host, an address outside the subnet or a MAC clash; the `mem` option text lacks the "never exactly 2048" note for devboxes.
+- The unfree check asserts the shared predicate function, not that nuc1 itself stays free-only.
+- Ctrl-X then `SessionEnd`: see "Board, known bug" below (still open).
 
 - Managed settings. The path `/etc/claude-code/managed-settings.json` and the hook schema were
   read from the strings of the pinned Claude Code binary (2.1.289), not from its documentation.
@@ -318,7 +370,8 @@ Nothing here blocks use; they are what was deferred, so that nobody is surprised
   for `192.168.1.200` also admits them.
 - Identity. The OIDC token of `devbox-secrets` stays valid on the server for 8 hours after
   the command ends (role TTL); a `bao token revoke -self` or a shorter TTL would tighten it.
-  The pre-auth key is single use; the tag is the key's, not the user's.
+  The pre-auth key is single use and valid one hour; the tag is the key's, not the user's. The key file
+  stays on the share until you delete it (the guest never reads it again once logged in).
 - Inputs. `config` is a plain flake input. It declares a private `nix-secrets` input (`git+ssh`,
   `flake = false`) that the lock pins and nothing uses (lazy). A Renovate bump of `config` that moves its
   revision may need an SSH key to fetch it. The fallback `config.inputs.nix-secrets.follows = ""` was not tested.

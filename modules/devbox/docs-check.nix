@@ -41,6 +41,14 @@ in
           need "microvm@devbox"
           need "statusKey"
           need "Known limits"
+          need "auth-key"
+          need "--tags tag:devbox"
+
+          # The first login runs as root from a key file: nothing in the runbook may bring back the
+          # operator setting (nobody could use it, and the guest no longer sets it).
+          if grep -qF -- '--operator' "$DOC"; then
+            fail "docs/devbox.md mentions --operator"
+          fi
 
           # Headscale refuses a node that sends tags together with a pre-auth key (the tags come
           # from the key): no command line of the runbook (a line that starts with the command, as
