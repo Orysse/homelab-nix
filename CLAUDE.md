@@ -38,9 +38,6 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
   k3s pinned to `k3s_1_36`, PostgreSQL to 18.
 - nuc1: new PSU since 2026-10-11, BIOS power limits (the 65 W one needed a 25 W software cap). NIC offloads off
   (e1000e hang, 2026-10-09).
-- Devbox (D28): NixOS microVM `devbox` on nuc1 (`192.168.1.201`, 2500 MB, topology `devboxes`, `modules/devbox/`),
-  reached over the tailnet (`tag:devbox`) with tmux and an agent board; home on `/srv/data/devbox`. Runbook:
-  `docs/devbox.md`. Deploy only with `MemAvailable` of at least 4096 MB on nuc1.
 - Memory (collapse of 2026-10-11): zram swap in the VMs, kubelet LimitedSwap, eviction at
   300 Mi, 1 Gi reserved for the control plane on kube-1 (`k3s/node.nix`). Headroom is small:
   check real free memory before adding an app; VM sizes stay 4000/3500/3500 MB.

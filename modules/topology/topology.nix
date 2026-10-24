@@ -3,7 +3,7 @@
     name = "homelab";
 
     # Router DHCP: .10–.150. Outside DHCP:
-    #   .200–.209  physical hosts and devboxes (.201 = devbox; inside the .192/26 VPN route)
+    #   .200–.209  physical hosts
     #   .210–.239  k3s nodes (kube-N = .21N)
     #   .240–.254  LoadBalancers (MetalLB)
     network = {
@@ -86,8 +86,5 @@
       kube-2 = { host = "nuc1"; address = "192.168.1.212"; role = "agent"; mem = 3500; vcpu = 2; balloon = true; };
       kube-3 = { host = "nuc1"; address = "192.168.1.213"; role = "agent"; mem = 3500; vcpu = 2; balloon = true; };
     };
-
-    # Dev VM (microVM outside k3s). mem in MB.
-    devboxes.devbox = { host = "nuc1"; address = "192.168.1.201"; mem = 2500; vcpu = 2; balloon = true; };
   };
 }
