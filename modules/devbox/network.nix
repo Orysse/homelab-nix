@@ -2,9 +2,13 @@
 # The first Tailscale login is manual, by design: NixOS applies `extraUpFlags` only together
 # with `authKeyFile`, and the pre-auth key (a secret) must not enter the repository. The owner
 # enters it once (runbook): `tailscale up --login-server https://hs.abe.lc --hostname devbox
-# --advertise-tags tag:devbox --accept-dns=false --auth-key <key>`. The node identity then
+# --accept-dns=false --operator=abel --auth-key <key>`, with a pre-auth key created with
+# `--tags tag:devbox`: Headscale takes the tag from the key and refuses a client that sends
+# --advertise-tags together with a key (checked on v0.29.5). The node identity then
 # lives in /var/lib/tailscale, persisted by the virtiofs share (guest.nix). Nix only pins
-# what `tailscale set` can: no DNS takeover.
+# what `tailscale set` can: no DNS takeover, and `abel` as the Tailscale operator. Without
+# the operator nobody could run that login: root cannot log in over SSH and `abel` has no
+# sudo. `tailscale up` must then repeat both flags, it refuses to leave a non-default one out.
 # SSH: `abel` only, keys only, on tailscale0 and from the host (break-glass from the LAN).
 { config, ... }:
 let
@@ -18,7 +22,7 @@ in
     {
       services.tailscale = {
         enable = true;
-        extraSetFlags = [ "--accept-dns=false" ];
+        extraSetFlags = [ "--accept-dns=false" "--operator=abel" ];
       };
 
       # users-ssh (imported by microvm-guest) is written for hosts: undo what the devbox
@@ -64,10 +68,11 @@ in
       assert rules22 == 1;
       assert !(opens22 fw);
       assert !(lib.any opens22 (lib.attrValues otherIfaces));
-      # Tailscale: the first login (login server, hostname, tag, key) is manual.
+      # Tailscale: the first login (login server, hostname, key; the tag is the key's) is manual.
       assert guest.services.tailscale.enable;
       assert guest.services.tailscale.authKeyFile == null;
       assert lib.elem "--accept-dns=false" guest.services.tailscale.extraSetFlags;
+      assert lib.elem "--operator=abel" guest.services.tailscale.extraSetFlags;
       assert !(lib.any (lib.hasInfix "login-server") guest.services.tailscale.extraUpFlags);
       pkgs.runCommand "devbox-ssh-rules" { } "touch $out";
   };
