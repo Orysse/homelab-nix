@@ -164,47 +164,78 @@ rec=$tmp/reconcile
 # --- agent-status-remote
 rm -f /tmp/x
 remote() { SSH_ORIGINAL_COMMAND=$1 agent-status-remote; }
-rdir=$tmp/remote
-export AGENT_STATUS_DIR=$rdir
+# agent-status-remote drops AGENT_STATUS_DIR, so its rows go to the default directory.
+rdir=$HOME/.local/state/agents
+export AGENT_STATUS_DIR=$tmp/not-used-by-remote
 
-check_rc "remote: injection with ;" 2 remote 'agent-status set --id a --state done; touch /tmp/x'
-check_rc "remote: injection with &&" 2 remote 'agent-status set --id a --state done && touch /tmp/x'
-check_rc "remote: injection with |" 2 remote 'agent-status set --id a --state done | touch /tmp/x'
-check_rc "remote: injection with backtick" 2 remote 'agent-status set --id a --task `touch /tmp/x`'
-check_rc "remote: injection with \$()" 2 remote 'agent-status set --id a --task $(touch /tmp/x)'
-check_rc "remote: redirect" 2 remote 'agent-status set --id a --state done > /tmp/x'
-check_rc "remote: glob" 2 remote 'agent-status set --id a --task /tmp/*'
-check_rc "remote: double quotes" 2 remote 'agent-status set --id a --task "x"'
+# Every payload below carries --machine laptop, so a rejection comes from the parser or from
+# agent-status, not from the missing machine name.
+M="--machine laptop"
+check_rc "remote: injection with ;" 2 remote "agent-status set $M --id a --state done; touch /tmp/x"
+check_rc "remote: injection with &&" 2 remote "agent-status set $M --id a --state done && touch /tmp/x"
+check_rc "remote: injection with |" 2 remote "agent-status set $M --id a --state done | touch /tmp/x"
+check_rc "remote: injection with backtick" 2 remote "agent-status set $M --id a --task \`touch /tmp/x\`"
+check_rc "remote: injection with \$()" 2 remote "agent-status set $M --id a --task \$(touch /tmp/x)"
+check_rc "remote: redirect" 2 remote "agent-status set $M --id a --state done > /tmp/x"
+check_rc "remote: glob" 2 remote "agent-status set $M --id a --task /tmp/*"
+check_rc "remote: double quotes" 2 remote "agent-status set $M --id a --task \"x\""
 check_rc "remote: rm" 2 remote 'agent-status rm a'
 check_rc "remote: list" 2 remote 'agent-status list'
 check_rc "remote: reconcile" 2 remote 'agent-status reconcile'
 check_rc "remote: \$(id)" 2 remote '$(id)'
 check_rc "remote: other command" 2 remote 'touch /tmp/x'
-check_rc "remote: embedded newline" 2 remote $'agent-status set --id a --state done\ntouch /tmp/x'
-check_rc "remote: carriage return" 2 remote $'agent-status set --id a --state done\rtouch /tmp/x'
-check_rc "remote: tab" 2 remote $'agent-status set\t--id a'
-check_rc "remote: newline inside quotes" 2 remote $'agent-status set --id a --task \'x\ny\''
-check_rc "remote: unterminated quote" 2 remote "agent-status set --id a --task 'x"
+check_rc "remote: embedded newline" 2 remote $'agent-status set --machine laptop --id a --state done\ntouch /tmp/x'
+check_rc "remote: carriage return" 2 remote $'agent-status set --machine laptop --id a --state done\rtouch /tmp/x'
+check_rc "remote: tab" 2 remote $'agent-status set\t--machine laptop --id a'
+check_rc "remote: newline inside quotes" 2 remote $'agent-status set --machine laptop --id a --task \'x\ny\''
+check_rc "remote: unterminated quote" 2 remote "agent-status set $M --id a --task 'x"
 check_rc "remote: empty command" 2 remote ''
 check_rc "remote: no command" 2 env -u SSH_ORIGINAL_COMMAND agent-status-remote
 check_rc "remote: bare agent-status" 2 remote 'agent-status'
 check_rc "remote: agent-status set with no flags" 2 remote 'agent-status set'
-check_rc "remote: path-qualified binary" 2 remote '/usr/bin/agent-status set --id a --state done'
-check_rc "remote: oversized command" 2 remote "agent-status set --id a --task '$(printf 'x%.0s' $(seq 1 5000))'"
-check_rc "remote: bad id is rejected by agent-status" 2 remote 'agent-status set --id ../x --state done'
+check_rc "remote: path-qualified binary" 2 remote "/usr/bin/agent-status set $M --id a --state done"
+check_rc "remote: oversized command" 2 remote "agent-status set $M --id a --task '$(printf 'x%.0s' $(seq 1 5000))'"
+check_rc "remote: bad id is rejected by agent-status" 2 remote "agent-status set $M --id ../x --state done"
 [[ ! -e /tmp/x ]] && ok "remote: nothing was executed" || fail "remote: /tmp/x exists"
 check_eq "remote: rejected input wrote nothing" "$(find "$rdir" -name '*.json' 2>/dev/null | wc -l)" "0"
 
 check_rc "remote: valid set" 0 remote "agent-status set --id r1 --agent claude --machine laptop --state working --task 'fix it'"
 check_eq "remote: row written" "$(jq -r '[.id,.machine,.state,.task]|join("|")' "$rdir/r1.json")" "r1|laptop|working|fix it"
 check_rc "remote: shell metacharacters in quotes stay data" 0 \
-  remote "agent-status set --id r2 --task '\$(touch /tmp/x); \`id\` | a > b'"
+  remote "agent-status set $M --id r2 --task '\$(touch /tmp/x); \`id\` | a > b'"
 check_eq "remote: quoted data is literal" "$(jq -r .task "$rdir/r2.json")" '$(touch /tmp/x); `id` | a > b'
-check_rc "remote: escaped quote idiom" 0 remote "agent-status set --id r3 --task 'it'\\''s fine'"
+check_rc "remote: escaped quote idiom" 0 remote "agent-status set $M --id r3 --task 'it'\\''s fine'"
 check_eq "remote: quote idiom literal" "$(jq -r .task "$rdir/r3.json")" "it's fine"
-check_rc "remote: concatenated segments" 0 remote "agent-status set --id r4 --task 'a'b'c d'"
+check_rc "remote: concatenated segments" 0 remote "agent-status set $M --id r4 --task 'a'b'c d'"
 check_eq "remote: segments joined" "$(jq -r .task "$rdir/r4.json")" "abc d"
 [[ ! -e /tmp/x ]] && ok "remote: quoted data never executed" || fail "remote: /tmp/x exists after quoted data"
+
+# --- agent-status-remote: the machine name is required and is never the devbox's own
+me=$(cat /proc/sys/kernel/hostname)
+before=$(find "$rdir" -name '*.json' | sort)
+check_rc "remote: missing --machine" 2 remote "agent-status set --id m1 --state done"
+check_rc "remote: --machine devbox" 2 remote "agent-status set --id m1 --machine devbox --state done"
+check_rc "remote: --machine DevBox (case)" 2 remote "agent-status set --id m1 --machine DevBox --state done"
+check_rc "remote: --machine own hostname" 2 remote "agent-status set --id m1 --machine '$me' --state done"
+check_rc "remote: --machine own hostname upper" 2 remote "agent-status set --id m1 --machine '${me^^}' --state done"
+check_rc "remote: --machine localhost" 2 remote "agent-status set --id m1 --machine localhost --state done"
+check_rc "remote: empty --machine" 2 remote "agent-status set --id m1 --machine '' --state done"
+check_rc "remote: --machine with space" 2 remote "agent-status set --id m1 --machine 'a b' --state done"
+check_rc "remote: --machine twice, devbox last" 2 remote "agent-status set --id m1 --machine thinkpad --machine devbox --state done"
+check_rc "remote: --machine twice, devbox first" 2 remote "agent-status set --id m1 --machine devbox --machine thinkpad --state done"
+check_rc "remote: --machine only as a value" 2 remote "agent-status set --id m1 --task --machine --state done"
+check_rc "remote: odd number of flag words" 2 remote "agent-status set --machine thinkpad --id m1 --state"
+check_eq "remote: machine rejections wrote nothing" "$(find "$rdir" -name '*.json' | sort)" "$before"
+check_rc "remote: --machine thinkpad accepted" 0 remote "agent-status set --id m2 --machine thinkpad --state working"
+check_eq "remote: machine recorded" "$(jq -r .machine "$rdir/m2.json")" "thinkpad"
+
+# AGENT_STATUS_DIR from the caller is dropped: the row lands in the default directory.
+redirect=$tmp/redirect
+default=$rdir
+check_rc "remote: AGENT_STATUS_DIR set by caller" 0 \
+  env AGENT_STATUS_DIR="$redirect" SSH_ORIGINAL_COMMAND="agent-status set --id e1 --machine thinkpad --state done" agent-status-remote
+[[ -f $default/e1.json ]] && ok "remote: row went to the default dir" || fail "remote: no row in $default"
+[[ ! -e $redirect ]] && ok "remote: AGENT_STATUS_DIR ignored" || fail "remote: wrote to the caller's AGENT_STATUS_DIR"
 
 echo
 if (( fails > 0 )); then echo "$fails test(s) failed" >&2; exit 1; fi
