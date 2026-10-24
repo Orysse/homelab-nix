@@ -65,21 +65,19 @@ The 2026-10-11 collapse came from RAM pressure. Check real free memory on nuc1 f
 ssh root@192.168.1.200 'free -m; grep MemAvailable /proc/meminfo'
 ```
 
-`MemAvailable` below 4096 MB (4194304 kB): stop. Do not deploy. Free memory first, or ask.
+`MemAvailable` below 4096 MB (4194304 kB): stop. Do not deploy. Free memory first, or ask. The deploy
+itself can start the VM, which takes 2500 MB at once (see the next section).
 
-## Deploy
+## Deploy and join the tailnet (once)
 
-```bash
-nix flake check
-nix run .#deploy-rs -- .#nuc1 --ssh-opts="-o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 -o BatchMode=yes"
-```
-
-The deploy does not restart VMs by itself (the repository rule) and does not start the new one: that
-is the next section, after the Tailscale key is in place. It creates `/srv/data/devbox/{home,tailscale}`.
-Never restart or stop `microvm@kube-*` for this. Afterwards, check that the nodes are
-unchanged: `kubectl get nodes` (all Ready) and `systemctl is-active microvm@kube-1 microvm@kube-2 microvm@kube-3`.
-
-## Join the tailnet (once)
+The VM may start at the deploy. The deploy does not restart a VM that already runs (`restartIfChanged
+= false`, `modules/vm/microvm-host.nix`; the repository rule), but that setting only concerns units that
+exist. `microvm.nix` makes `microvms.target` want `microvm@devbox.service` (`nixos-modules/host/default.nix`
+lines 326-333 in the pinned input), and `switch-to-configuration` starts every active target after a
+switch (`pkgs/by-name/sw/switch-to-configuration-ng/src/main.rs`, lines 1247-1268 and 2551-2565 in the
+pinned nixpkgs). So the first deploy starts `microvm@devbox` by itself, and the guest then claims its
+2500 MB at once: this is why the pre-flight asks for `MemAvailable` of at least 4096 MB. Plan for
+it, so the Tailscale key must be on the share before the deploy, not after.
 
 The join runs as root inside the VM at boot (nobody else could: root cannot log in over SSH and
 `abel` has no sudo). The guest's `tailscaled-autoconnect` unit runs `tailscale up --auth-key
@@ -89,35 +87,47 @@ put the key in `/srv/data/devbox/tailscale/auth-key` on nuc1 (root-owned, 0600).
 only the path. The node identity then lives in `/srv/data/devbox/tailscale`, so a rebuild or a
 restart keeps it and never reads the file again.
 
-1. Create the key, tagged. The tag comes from the key; Headscale v0.29.5 does not check
-   `tagOwners` when it is used, and it rejects a client that also sends tags of its own, so there is
-   no `--advertise-tags` anywhere.
+1. Create the key right before the deploy, tagged, valid one hour and usable once. The tag comes from
+   the key; Headscale v0.29.5 does not check `tagOwners` when it is used, and it rejects a client that also
+   sends tags of its own, so there is no `--advertise-tags` anywhere.
 
    ```bash
    kubectl -n headscale exec deploy/headscale -- headscale users list                # the id of the user `infra`
    kubectl -n headscale exec deploy/headscale -- headscale preauthkeys create --user <infra id> --tags tag:devbox --expiration 1h
    ```
 
-2. Write it on nuc1, then start the VM (the key is valid one hour and works once):
+2. On nuc1, right before the deploy: make the directory and write the key into it. The deploy would
+   create the directory too (same mode), but not in time.
 
    ```bash
    ssh root@192.168.1.200
+   install -d -m 0700 /srv/data/devbox/tailscale
    read -rs KEY && printf '%s\n' "$KEY" | install -m 0600 /dev/stdin /srv/data/devbox/tailscale/auth-key; unset KEY   # paste the key, Enter
-   systemctl start microvm@devbox
    ```
 
-3. Check, from nuc1 and the cluster: `ssh root@192.168.1.200 'systemctl is-active microvm@devbox'`, and
-   `kubectl -n headscale exec deploy/headscale -- headscale nodes list` shows `devbox`, owned by `tagged-devices`,
-   tag `tag:devbox`, online. On your PC `tailscale status` lists it. Then delete the key file on nuc1,
-   it is spent: `rm /srv/data/devbox/tailscale/auth-key`.
-4. From then on `ssh abel@devbox` works (MagicDNS name `devbox.ts.abe.lc`, or the `100.64.x.y` address of
+3. Deploy (pre-flight done, `MemAvailable` of at least 4096 MB):
+
+   ```bash
+   nix flake check
+   nix run .#deploy-rs -- .#nuc1 --ssh-opts="-o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 -o BatchMode=yes"
+   ```
+
+   Never restart or stop `microvm@kube-*` for this. Afterwards, check that the nodes are
+   unchanged: `kubectl get nodes` (all Ready) and `systemctl is-active microvm@kube-1 microvm@kube-2 microvm@kube-3`.
+4. On nuc1: `systemctl is-active microvm@devbox`. If it says `active`, the deploy started it. If not, start
+   it now with `systemctl start microvm@devbox` (the key is still valid for the hour).
+5. Check, from nuc1 and the cluster: `kubectl -n headscale exec deploy/headscale -- headscale nodes list`
+   shows `devbox`, owned by `tagged-devices`, tag `tag:devbox`, online. On your PC `tailscale status` lists
+   it. Then delete the key file on nuc1, it is spent: `rm /srv/data/devbox/tailscale/auth-key`.
+6. From then on `ssh abel@devbox` works (MagicDNS name `devbox.ts.abe.lc`, or the `100.64.x.y` address of
    `tailscale status`).
 
-If the VM started before the file existed, `tailscale up` waited for a browser login and systemd killed
-the unit after its start timeout (90 s); the node stays logged out and nothing retries. Write the file and
-restart the VM from nuc1 (`systemctl restart microvm@devbox`; there is no root in the guest to restart one unit).
-The same applies when the node was deleted from Headscale: new key, new file, restart, delete the file.
-Before the tailnet works, reach the VM from the laptop with the jump host (see Break-glass).
+Recovery. If the file is missing or the key expired or was already used when the VM booted, `tailscale up`
+waited for a browser login and systemd killed the unit after its start timeout (90 s); the node stays
+logged out and nothing retries. Create a new key, write it to the file as in step 2, and restart the VM
+from nuc1 (`systemctl restart microvm@devbox`; there is no root in the guest to restart one unit), then
+delete the file. The same applies when the node was deleted from Headscale: new key, new file, restart,
+delete the file. Before the tailnet works, reach the VM from the laptop with the jump host (see Break-glass).
 
 SSH client entry, so that `ssh devbox` is enough:
 
@@ -156,8 +166,11 @@ devbox-secrets          # prints a URL: open it in the PC's browser; the callbac
 echo ${DEEPSEEK_API_KEY:+set}
 ```
 
-New zsh windows pick the file up; the shell that ran `devbox-secrets` reloads it. If anything fails,
-the old file stays as it was.
+New zsh windows pick the file up; the shell that ran `devbox-secrets` reloads it. Agents started with
+`agent-run` or Ctrl-N on the board run in a non-interactive shell, so `agent-run` reads the file itself
+when the agent starts (the same strict text parse: three keys, a regular file of `abel` with mode 0600,
+values of `[A-Za-z0-9_.-]+`, nothing sourced); an agent already running keeps the keys it started with.
+If anything fails, the old file stays as it was.
 
 ## The board
 
@@ -166,10 +179,17 @@ state. States: `scheduled`, `working`, `waiting`, `done`, `failed`, `skipped`, `
 
 | Key | Action |
 |---|---|
-| Enter | jump to the agent's tmux window (`devbox:<id>`) |
+| Enter | jump to the agent's tmux window (`devbox:<id>`); with no window, open its log |
 | Ctrl-L | open its log in `less` |
 | Ctrl-N | start an agent (asks `claude` or `opencode`, then the task; runs `agent-run`) |
-| Ctrl-X | kill the agent's window and mark it `stopped` |
+| Ctrl-X | mark the agent `stopped`, then kill its window |
+
+Enter and Ctrl-X act only on a row of the devbox itself (machine = the devbox's hostname or `devbox`)
+and, for Ctrl-X, only when a window named exactly like the row's id exists. A row of another machine is
+view-only (Ctrl-L): the board prints one line and changes nothing, so a tmux window that happens to carry
+the same name (`zsh`) is never selected or killed. Ctrl-X marks `stopped` first so that Claude Code's
+`SessionEnd` hook, which runs as the session dies, leaves the row as it is (`agent-hook` does not write a
+`stopped` row of `agent-run`).
 
 Back on the board: select the first tmux window with your usual key. From a shell,
 `agent-run --agent claude|opencode --task "..." [--dir DIR]` does the same as Ctrl-N, and
@@ -192,7 +212,9 @@ Run it now: `systemctl --user start job-triage`; logs: `journalctl --user -u job
 
 A laptop or another server reports to the board through the restricted key of prerequisite 3. The
 key can run `agent-status set` and nothing else (`command="agent-status-remote",restrict`); those
-rows show state but you cannot attach to them from the devbox. The machine needs the tailnet and
+rows show state but you cannot attach to them from the devbox. The key cannot change a row of the
+devbox itself either: a call for an id whose row belongs to the devbox is refused (exit 2,
+`agent-status: refused: <id> is a row of this machine`). The machine needs the tailnet and
 Linux or macOS with `ssh`. Windows is out of scope.
 
 The call, with `--machine <hostname of the calling machine>` mandatory (the devbox refuses its own
@@ -278,8 +300,10 @@ Run it from the laptop and from a second machine on the tailnet.
    `git --version` work.
 3. `devbox-secrets` succeeds through the forwarded login (`ssh -L 8250:localhost:8250 devbox`);
    `echo ${DEEPSEEK_API_KEY:+set}` prints `set`; `~/.vault-token` does not exist.
-4. `agent-run --agent claude --task "hello"`: the board shows `working`, then `waiting`; Enter jumps
-   to the window; Ctrl-X stops it.
+4. After `devbox-secrets`, `agent-run --agent claude --task "hello"`: the board shows `working`, then
+   `waiting`; Enter jumps to the window; the agent has the keys (the names, not the values:
+   `tr '\0' '\n' </proc/<pid of claude>/environ | cut -d= -f1 | grep -E 'DEEPSEEK|OPENROUTER|GITHUB'`);
+   Ctrl-X stops it and the row stays `stopped`.
 5. From the laptop, the restricted key writes a row (the call above) and any other command with that key is
    refused: `ssh -i ~/.ssh/devbox-status abel@devbox true` prints `agent-status-remote: rejected: ...`.
 6. Memory cap, in the VM: `systemd-run --user --scope tail /dev/zero`. No `-p`: the scope has no
@@ -306,7 +330,7 @@ Run it from the laptop and from a second machine on the tailnet.
   (prerequisite 4); the VM is down (`systemctl is-active microvm@devbox` on nuc1). Use the break-glass path.
 - The VM is up but `devbox` is not in `headscale nodes list`: `ssh -J root@192.168.1.200 abel@192.168.1.201`
   (break-glass) and `tailscale status` (readable without root); on nuc1, `journalctl -u microvm@devbox`
-  shows the guest console. The usual causes: the key file was missing at boot (see "Join the tailnet"), the key was
+  shows the guest console. The usual causes: the key file was missing at boot (see "Deploy and join the tailnet"), the key was
   already used or older than one hour (create a new one, rewrite the file, restart the VM), or the key was created
   without `--tags tag:devbox` (the node would be a personal node of the key's user, with no ACL to reach it).
 - Do not add `--advertise-tags` anywhere: Headscale rejects a client that sends tags together with a
@@ -318,9 +342,10 @@ Run it from the laptop and from a second machine on the tailnet.
 - `permission denied` reading `kv/apps/devbox/...`: Flux has not applied the role and policy yet,
   or you are not in the Pocket-ID group `admins`.
 - Hand-editing `$XDG_RUNTIME_DIR/devbox-env`: lines `KEY=value`, no `export`, no quotes, a value of
-  `[A-Za-z0-9_.-]+`, mode 0600, owned by `abel`. zsh loads only the three known keys as text and
-  `job-triage` reads only `GITHUB_TOKEN`, and it ignores the file if the mode or owner is wrong
-  (the job then fails with `no GitHub credential`). Prefer rerunning `devbox-secrets`.
+  `[A-Za-z0-9_.-]+`, mode 0600, owned by `abel`. zsh and `agent-run` load only the three known keys as
+  text (the first line of a key wins) and `job-triage` reads only `GITHUB_TOKEN`; all three ignore the file
+  if it is a link or the mode or owner is wrong (the job then fails with `no GitHub credential`, an agent
+  starts without keys). Prefer rerunning `devbox-secrets`.
 - Two rows for one Claude Code session, or none for a headless `claude -p` run: set `AGENT_HOOK_DISABLE=1`
   in the environment of a `claude` that must not touch the board (the managed hook then does nothing);
   `job-triage` sets it for its own run, which has a row of its own.
@@ -345,7 +370,7 @@ Security-relevant:
 - The OpenBao policy `devbox` grants `read` on `kv/apps/metadata/devbox/*`; `list` would suffice.
 - The log opened with `<>` can create an empty file if the log is deleted between the path check and the
   open (it stays under the status directory); the read-only fallback open is not atomic (availability only).
-- The OIDC token and the remote-row overwrite are described below.
+- The OIDC token is described below.
 
 Other deferred items, one line each:
 
@@ -355,7 +380,6 @@ Other deferred items, one line each:
 - The `devbox-ssh-rules` check finds the SSH rule by the substring `dport 22`, which is loose.
 - No negative topology checks for a devbox name that is too long, an unknown host, an address outside the subnet or a MAC clash; the `mem` option text lacks the "never exactly 2048" note for devboxes.
 - The unfree check asserts the shared predicate function, not that nuc1 itself stays free-only.
-- Ctrl-X then `SessionEnd`: see "Board, known bug" below (still open).
 
 - Managed settings. The path `/etc/claude-code/managed-settings.json` and the hook schema were
   read from the strings of the pinned Claude Code binary (2.1.289), not from its documentation.
@@ -379,14 +403,21 @@ Other deferred items, one line each:
 - Hardcoded paths. The guest uses `/srv/data/devbox`, uid 1000 and `user-1000.slice`. Only
   `claude-code` is unfree (a second nixpkgs instance, without nuc1's overlays; there are none today).
   The real `vim` stays in the closure (`vi`, `view`, `vimdiff`).
-- Board and remote rows. A remote row can overwrite a local row that has the same id (the machine field
-  differs) and sets arbitrary `--window` and `--log` strings: the board ignores `window`, targets only
-  `devbox:<id>`, and opens a log only if it resolves to a regular file under the status directory. Hard links
-  pass that test (they need a local write). Two windows with the same name: Ctrl-X kills the first.
-- Board, known bug: Ctrl-X kills the window, then marks the row `stopped`; Claude Code's `SessionEnd` hook
-  can then overwrite `stopped` with `done`. To fix before merging: skip the update in `agent-hook` when the
-  row is `stopped`.
-- Agents. A Claude Code started inside an agent window inherits `AGENT_RUN_ID`; a `scheduled` row stays if
+- Board and remote rows. A remote row sets arbitrary `--window` and `--log` strings: the board ignores
+  `window`, targets only `devbox:<id>`, and opens a log only if it resolves to a regular file under the status
+  directory. Hard links pass that test (they need a local write). Two windows with the same name: Ctrl-X
+  kills the first. A remote row can no longer replace a row of the devbox, but the guard lives in
+  `agent-status-remote` (`--remote`): a local shell calling `agent-status` is trusted. A remote row cannot be
+  removed from the board (`agent-status rm <id>` by hand). Ctrl-X marks `stopped` before it kills, and
+  `agent-hook` reads the row just before it writes, so a `SessionEnd` that reads in the few milliseconds
+  before Ctrl-X writes can still turn `stopped` into `done`.
+- Hand-started Claude Code sessions. The `claude-xxxxxxxx` rows of a `claude` started by hand (through the
+  hooks) have no pid and no window, so `agent-status reconcile` ignores them: if such a session dies without a
+  `SessionEnd` (a killed terminal, a VM restart), its row stays `working` or `waiting` until you `agent-status rm`
+  it. The hook cannot record a pid (`$PPID` in a hook is not reliable). Enter on such a row opens its log if
+  it has one, else nothing; Ctrl-X refuses it (no window of that name).
+- Agents. `agent-run` reads `devbox-env` once, when the agent starts (an agent started before
+  `devbox-secrets` has no keys; restart it). A Claude Code started inside an agent window inherits `AGENT_RUN_ID`; a `scheduled` row stays if
   its window dies before the wrapper runs; logs hold the terminal's raw escape codes and have no size cap;
   `job-triage` truncates its previous log, lists at most 100 pull requests, and its branch filter also matches
   forks' `renovate/*` branches. Its `--setting-sources ""` relies on behaviour of Claude Code 2.1.289 that is not documented.

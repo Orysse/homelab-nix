@@ -44,6 +44,28 @@ in
           need "auth-key"
           need "--tags tag:devbox"
 
+          # Deploy order: the VM may start at the deploy (microvms.target wants it), so the key file
+          # and its directory must be written BEFORE the deploy command, and the runbook must say the
+          # VM can start then and what it takes.
+          need "install -d -m 0700 /srv/data/devbox/tailscale"
+          need "install -m 0600 /dev/stdin /srv/data/devbox/tailscale/auth-key"
+          need "systemctl is-active microvm@devbox"
+          need "MemAvailable"
+          need "2500 MB"
+          need "may start at the deploy"
+          key_line=$(grep -nF -- 'install -m 0600 /dev/stdin /srv/data/devbox/tailscale/auth-key' "$DOC" | head -1 | cut -d: -f1)
+          dir_line=$(grep -nF -- 'install -d -m 0700 /srv/data/devbox/tailscale' "$DOC" | head -1 | cut -d: -f1)
+          deploy_line=$(grep -nF -- 'nix run .#deploy-rs' "$DOC" | head -1 | cut -d: -f1)
+          [ -n "$key_line" ] && [ -n "$dir_line" ] && [ -n "$deploy_line" ] || fail "deploy order: a command line is missing"
+          [ "$dir_line" -lt "$deploy_line" ] && [ "$key_line" -lt "$deploy_line" ] \
+            || fail "docs/devbox.md writes the auth-key after the deploy command"
+
+          # Fixed problems must not come back as open ones; the limits that remain are named.
+          if grep -qF -- 'Board, known bug' "$DOC"; then
+            fail "docs/devbox.md still has the 'Board, known bug' paragraph (fixed: Ctrl-X marks stopped first)"
+          fi
+          need "Hand-started Claude Code sessions"
+
           # The first login runs as root from a key file: nothing in the runbook may bring back the
           # operator setting (nobody could use it, and the guest no longer sets it).
           if grep -qF -- '--operator' "$DOC"; then
