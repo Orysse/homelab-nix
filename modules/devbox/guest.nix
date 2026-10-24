@@ -13,6 +13,7 @@ in
       topModules.devbox-network
       topModules.devbox-tools
       topModules.devbox-board
+      topModules.devbox-jobs
       # Read from the topology; an option only so that the eval check can override it.
       ({ lib, node, ... }: {
         options.devbox.statusKey = lib.mkOption {
