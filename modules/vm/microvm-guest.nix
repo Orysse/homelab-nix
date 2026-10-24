@@ -1,4 +1,4 @@
-# `node` (specialArgs): the node's name in the topology.
+# `node` (specialArgs): the VM's name in the topology (a node or a devbox).
 { config, ... }:
 let
   inherit (config) cluster;
@@ -8,7 +8,8 @@ in
   flake.modules.nixos.microvm-guest = { lib, node, ... }:
     let
       clusterLib = import ../topology/_lib.nix { inherit lib; };
-      spec = cluster.nodes.${node};
+      # Kube nodes and devboxes share the VM plumbing (names are unique across both).
+      spec = (cluster.nodes // cluster.devboxes).${node};
     in
     {
       imports = [ topModules.base topModules.users-ssh ];

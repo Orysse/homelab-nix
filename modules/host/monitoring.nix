@@ -4,7 +4,7 @@
 #                          scrapes this host's exporters itself
 #   VictoriaLogs    :9428  logs, pushed by Alloy and by systemd-journal-upload (journald)
 # Alerting: alerting.nix (vmalert + Alertmanager). Dashboards: Grafana, in the cluster.
-# Both ports only accept the nodes; the exporters listen on localhost.
+# Both ports only accept the nodes and the devboxes; the exporters listen on localhost.
 { config, ... }:
 let
   inherit (config) cluster;
@@ -14,7 +14,9 @@ in
     let
       domain = cluster.ingress.domain;
       host = config.networking.hostName;
-      nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
+      # The nodes and the devboxes push their journal here.
+      nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes)
+        ++ lib.mapAttrsToList (_: d: d.address) cluster.devboxes;
       fromNodes = port: lib.concatMapStrings
         (ip: "iptables -A nixos-fw -p tcp -s ${ip} --dport ${toString port} -j nixos-fw-accept\n")
         nodeIPs;
