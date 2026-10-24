@@ -4,8 +4,10 @@
 # the first window of the tmux session `devbox`; `devbox-session` creates or attaches that session (the
 # zsh login hook in guest.nix runs it). The scripts live in board/ (not .nix, so import-tree
 # skips them) and shellcheck runs on them at build time.
-# tmux and fzf are not in the runtimeInputs of board and devbox-session: they come from the PATH
-# (the owner's tmux, see tools.nix), as does `agent-run` (called by name, Ctrl-N in the board).
+# `agent-run` starts an agent in its own window and keeps its row; `agent-hook` is the Claude Code
+# hook that writes the row of a session (registered in the managed settings below).
+# tmux and fzf are not in the runtimeInputs of board, devbox-session and agent-run: they come from the PATH
+# (the owner's tmux, see tools.nix), as does `agent-run` for the board (called by name, Ctrl-N).
 { config, lib, ... }:
 let
   mkBoard = pkgs: rec {
@@ -29,7 +31,37 @@ let
       runtimeInputs = [ board pkgs.coreutils ];
       text = builtins.readFile ./board/devbox-session.sh;
     };
+    # tmux is not in the runtimeInputs (the owner's tmux comes from the PATH, as for board), and
+    # neither are claude and opencode: the agent is looked up on the PATH of the caller.
+    agent-run = pkgs.writeShellApplication {
+      name = "agent-run";
+      runtimeInputs = [ agent-status pkgs.util-linux pkgs.coreutils pkgs.gnugrep ];
+      text = builtins.readFile ./board/agent-run.sh;
+    };
+    agent-hook = pkgs.writeShellApplication {
+      name = "agent-hook";
+      runtimeInputs = [ agent-status pkgs.jq pkgs.coreutils ];
+      text = builtins.readFile ./board/agent-hook.sh;
+    };
   };
+
+  # Claude Code (2.1.289, read in the binary) reads /etc/claude-code/managed-settings.json on
+  # Linux. `hooks` maps an event name to a list of
+  # { matcher?, hooks: [ { type = "command"; command; timeout (seconds) } ] }, and each hook gets
+  # its JSON on stdin (session_id, cwd, hook_event_name, ...). The settings carry hooks only, so
+  # the owner's own settings and hooks stay in effect.
+  hookEvents = [ "SessionStart" "Notification" "Stop" "UserPromptSubmit" "SessionEnd" ];
+  managedSettings = pkgs:
+    let board = mkBoard pkgs;
+    in builtins.toJSON {
+      hooks = lib.genAttrs hookEvents (event: [{
+        hooks = [{
+          type = "command";
+          command = "${lib.getExe board.agent-hook} ${event}";
+          timeout = 5;
+        }];
+      }]);
+    };
 in
 {
   # Installs the board commands on the devbox (imported by devbox-guest).
@@ -41,13 +73,17 @@ in
         board.agent-status-remote
         board.board
         board.devbox-session
+        board.agent-run
+        board.agent-hook
       ];
+
+      environment.etc."claude-code/managed-settings.json".text = managedSettings pkgs;
     };
 
   perSystem = { pkgs, ... }:
     let board = mkBoard pkgs;
     in {
-      packages = { inherit (board) agent-status agent-status-remote board devbox-session; };
+      packages = { inherit (board) agent-status agent-status-remote board devbox-session agent-run agent-hook; };
 
       checks.agent-status = pkgs.runCommand "agent-status"
         {
@@ -85,6 +121,34 @@ in
             LOGIN_SNIPPET = pkgs.writeText "devbox-login-snippet.zsh" snippet;
           } ''
           bash ${./board/tests/session.sh}
+          touch $out
+        '';
+
+      # agent-run and agent-hook with stub agents on a private tmux socket. The managed settings
+      # tested are the ones of the devbox guest, so a missing import fails here.
+      checks.agent-run =
+        let
+          guest = config.flake.nixosConfigurations.nuc1.config.microvm.vms.devbox.config.config;
+          settings = guest.environment.etc."claude-code/managed-settings.json".text;
+        in
+        pkgs.runCommand "agent-run"
+          {
+            nativeBuildInputs = [
+              board.agent-run
+              board.agent-hook
+              board.agent-status
+              pkgs.tmux
+              pkgs.util-linux
+              pkgs.jq
+              pkgs.coreutils
+              pkgs.findutils
+              pkgs.gnugrep
+              pkgs.bash
+            ];
+            MANAGED_SETTINGS = pkgs.writeText "managed-settings.json" settings;
+            AGENT_HOOK_BIN = lib.getExe board.agent-hook;
+          } ''
+          bash ${./board/tests/run.sh}
           touch $out
         '';
     };
