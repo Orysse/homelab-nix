@@ -5,7 +5,8 @@
 # where each word is plain characters or single-quoted text ('it'\''s' is the usual way to
 # send an apostrophe). No shell ever sees the text: it is split by this script into an array
 # and handed to agent-status with exec. Anything else exits 2.
-# agent-status itself checks the flags and values.
+# agent-status itself checks the flags and values. This script puts `--remote` in front of them
+# (a caller who sends it is rejected): agent-status then refuses to overwrite a row of this machine.
 #
 # --machine NAME is required (once) and is never the devbox's own name (its hostname, `devbox`,
 # `localhost`): every remote row carries its origin and cannot pass for a local one, which
@@ -83,6 +84,8 @@ flags=("${words[@]:2}")
 machine=""
 machines=0
 for ((i = 0; i < ${#flags[@]}; i += 2)); do
+  # --remote is ours to add below; from the caller it is an unknown flag.
+  [[ ${flags[i]} != "--remote" ]] || reject "unknown option --remote"
   if [[ ${flags[i]} == "--machine" ]]; then
     machine=${flags[i + 1]}
     machines=$((machines + 1))
@@ -97,4 +100,5 @@ for own_name in "$own" "${own%%.*}" devbox localhost; do
   [[ $name != "$own_name" && ${name%%.*} != "$own_name" ]] || reject "--machine must name the calling machine, not this one"
 done
 
-exec agent-status "${words[@]:1}"
+# --remote: agent-status then refuses to change a row of this machine (a local agent's row).
+exec agent-status set --remote "${words[@]:2}"

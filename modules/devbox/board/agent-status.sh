@@ -1,6 +1,9 @@
 # shellcheck shell=bash
 # agent-status: one JSON row per agent in $AGENT_STATUS_DIR (default ~/.local/state/agents).
 #   agent-status set --id ID [--agent A] [--machine M] [--task T] [--state S] [--pid N] [--window W] [--log PATH]
+#                    [--remote]
+#     --remote (no value) is added by agent-status-remote only: the set is then refused (exit 2) when
+#     the existing row of ID belongs to this machine, so a remote key cannot take over a local row.
 #   agent-status list [--json]
 #   agent-status rm ID
 #   agent-status reconcile
@@ -70,9 +73,38 @@ write_row() {
   tmp=""
 }
 
+# is_local_machine NAME: true for this host's name (any case, or its first DNS label) and `devbox`.
+is_local_machine() {
+  local name=${1,,} own own_name
+  own=$(<"/proc/sys/kernel/hostname")
+  own=${own,,}
+  for own_name in "$own" "${own%%.*}" devbox; do
+    if [[ $name == "$own_name" || ${name%%.*} == "$own_name" ]]; then return 0; fi
+  done
+  return 1
+}
+
+# refuse_local_row ID: a --remote set may not touch an existing row of this machine (a row with no
+# machine field counts as one: write_row would fill in this host's name). Caller holds the lock.
+refuse_local_row() {
+  local old machine
+  old=$(read_row "$dir/$1.json")
+  [[ -n $old ]] || return 0
+  machine=$(jq -r '.machine | if type == "string" then . else "" end' <<<"$old")
+  if [[ -z $machine ]] || is_local_machine "$machine"; then
+    die "refused: $1 is a row of this machine"
+  fi
+}
+
 cmd_set() {
-  local id="" patch='{}' key value
+  local id="" patch='{}' key value remote=0
   while (($# > 0)); do
+    # --remote has no value: agent-status-remote (and nothing else) adds it, after its own checks.
+    if [[ $1 == --remote ]]; then
+      remote=1
+      shift
+      continue
+    fi
     (($# >= 2)) || die "$1 needs a value"
     key=${1#--}
     value=$2
@@ -103,6 +135,7 @@ cmd_set() {
   done
   [[ -n $id ]] || die "--id is required"
   lock
+  if ((remote)); then refuse_local_row "$id"; fi
   write_row "$id" "$patch"
 }
 

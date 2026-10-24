@@ -6,6 +6,9 @@
 # Rows may come from other machines through a restricted SSH key, so every field of a row is
 # untrusted. Of a row only the id picks what happens, and it is checked against the id rule first:
 #   - the tmux target is always devbox:<id>, the row's `window` field is never read;
+#   - Enter and Ctrl-X act only on a row of this machine (its machine is this host's name or
+#     `devbox`) and, for Ctrl-X, only when a window named exactly <id> exists; a remote row is
+#     view-only (Ctrl-L), so a window that shares its id (zsh) is never selected or killed;
 #   - a log is opened only when its real path (links resolved) is a regular file under the
 #     status directory; anything else gets a one-line message.
 
@@ -114,12 +117,38 @@ cmd_list() {
   } | column -t -s $'\t'
 }
 
+# is_local_row ID: true when the row's machine is this host (any case, or its first DNS label) or
+# `devbox` (what the Claude Code hook writes). A row of another machine, or with no machine, is not.
+is_local_row() {
+  local f machine own name own_name
+  f=$(row_file "$1") || return 1
+  machine=$(head -c "$max_file" "$f" 2>/dev/null | jq -r 'select(type == "object") | .machine | strings' 2>/dev/null) || return 1
+  [[ -n $machine ]] || return 1
+  name=${machine,,}
+  own=$(<"/proc/sys/kernel/hostname")
+  own=${own,,}
+  for own_name in "$own" "${own%%.*}" devbox; do
+    if [[ $name == "$own_name" || ${name%%.*} == "$own_name" ]]; then return 0; fi
+  done
+  return 1
+}
+
 cmd_enter() {
   local id=${1:-} wid
   valid_id "$id" || {
     msg "invalid id"
     return 0
   }
+  # A window named like the id of a remote row is not that agent's: only rows of this machine
+  # have a window here. (Ctrl-L still opens the log of any row.)
+  row_file "$id" >/dev/null || {
+    msg "$id: no such row"
+    return 0
+  }
+  if ! is_local_row "$id"; then
+    msg "$id: row of another machine, no window here"
+    return 0
+  fi
   if wid=$(window_id "$id") && tmux select-window -t "$wid" 2>/dev/null; then
     return 0
   fi
@@ -149,8 +178,19 @@ cmd_kill() {
     msg "$id: no such row"
     return 0
   }
-  if wid=$(window_id "$id"); then tmux kill-window -t "$wid" 2>/dev/null || true; fi
-  agent-status set --id "$id" --state stopped
+  # Only an agent of this machine with a window of its own name: a remote row, or a window that
+  # merely shares the id (zsh), is left alone, and the row is not marked.
+  if ! is_local_row "$id"; then
+    msg "$id: row of another machine, nothing to stop here"
+    return 0
+  fi
+  wid=$(window_id "$id") || {
+    msg "$id: no window to stop"
+    return 0
+  }
+  # `stopped` first: Claude Code's SessionEnd hook runs after the kill and leaves a stopped row alone.
+  agent-status set --id "$id" --state stopped || msg "$id: cannot mark the row stopped"
+  tmux kill-window -t "$wid" 2>/dev/null || true
 }
 
 cmd_new() {

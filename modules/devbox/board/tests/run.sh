@@ -24,8 +24,11 @@ export TERM=xterm
 export SHELL
 SHELL=$(command -v bash)
 export AGENT_STATUS_DIR=$tmp/agents
-unset TMUX SSH_CONNECTION AGENT_RUN_ID
-mkdir -p "$HOME/work" "$TMUX_TMPDIR" "$tmp/elsewhere"
+# devbox-env (written by devbox-secrets) is read from here by the agent-run wrapper.
+export XDG_RUNTIME_DIR=$tmp/run
+unset TMUX SSH_CONNECTION AGENT_RUN_ID DEEPSEEK_API_KEY OPENROUTER_API_KEY GITHUB_TOKEN EVIL
+mkdir -p "$HOME/work" "$TMUX_TMPDIR" "$tmp/elsewhere" "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
 # The owner's tmux config sets base-index 1: no test may assume a window index.
 echo 'set -g base-index 1' >"$HOME/.tmux.conf"
 trap 'tmux kill-server 2>/dev/null; rm -rf "$tmp"' EXIT
@@ -39,6 +42,9 @@ for name in claude opencode; do
     echo "echo \"stub-$name \$*\""
     echo 'echo "cwd=$PWD"'
     echo 'echo "run-id=${AGENT_RUN_ID:-}"'
+    echo 'echo "keys=${DEEPSEEK_API_KEY:-}|${OPENROUTER_API_KEY:-}|${GITHUB_TOKEN:-}"'
+    echo 'echo "evil=${EVIL:-}"'
+    echo 'echo "stub-path=$PATH"'
     echo 'while [[ -e $HOME/gate ]]; do sleep 0.1; done'
     echo '[[ -r $HOME/stub-exit ]] && exit "$(<"$HOME/stub-exit")"'
     echo 'exit 0'
@@ -163,6 +169,88 @@ check_eq "an existing session keeps one board" "$(windows | tr ',' '\n' | grep -
 rm -f "$HOME/gate"
 wait_state claude-10 done || fail "claude-10 not done"
 
+# --- API keys: tmux runs the window command in a non-interactive shell, so the wrapper loads
+# $XDG_RUNTIME_DIR/devbox-env itself, as text (like devbox-load-env): three known keys, a regular
+# file owned by the user with no group/world bit, values of [A-Za-z0-9_.-]+, first line of a key
+# wins, never sourced.
+env_file=$XDG_RUNTIME_DIR/devbox-env
+# run_agent: runs a stub agent through agent-run; sets run_id and run_log (the stub's output).
+run_agent() {
+  run_id=$(agent-run --agent claude --task "env test") || fail "agent-run failed"
+  wait_state "$run_id" done && ok "the agent ran ($run_id done)" || fail "$run_id is '$(field "$run_id" state)', want done"
+  run_log=$(tr -d '\r' <"$AGENT_STATUS_DIR/$run_id.log" 2>/dev/null) # script's terminal adds CRs
+}
+write_env() { # MODE (content on stdin)
+  rm -f "$env_file"
+  (umask 077 && cat >"$env_file")
+  chmod "$1" "$env_file"
+}
+write_env 600 <<'EOF'
+DEEPSEEK_API_KEY=ds-key.1
+OPENROUTER_API_KEY=or_key-2
+GITHUB_TOKEN=ghp_Tok3n
+EVIL=1
+PATH=/evil
+DEEPSEEK_API_KEY=second
+EOF
+run_agent
+check_has "wrapper: the three keys reach the agent" "$run_log" '^keys=ds-key\.1\|or_key-2\|ghp_Tok3n$'
+check_has "wrapper: an unrelated key (EVIL) is ignored" "$run_log" '^evil=$'
+check_eq "wrapper: PATH from the file is ignored" "$(grep -c '^stub-path=.*/evil' <<<"$run_log" || true)" "0"
+check_has "wrapper: the agent still knows its row id" "$run_log" "^run-id=$run_id\$"
+
+# hostile values and a bad first line: unset, nothing runs, the agent still starts
+write_env 600 <<EOF
+DEEPSEEK_API_KEY=\$(touch $tmp/pwned)
+OPENROUTER_API_KEY=a;touch $tmp/pwned2
+GITHUB_TOKEN=bad value
+DEEPSEEK_API_KEY=good-second-line
+EOF
+run_agent
+check_has "wrapper: hostile values are not exported" "$run_log" '^keys=\|\|$'
+[[ ! -e $tmp/pwned && ! -e $tmp/pwned2 ]] && ok "wrapper: the env file is never executed" || fail "wrapper: the env file ran a command"
+write_env 600 <<'EOF'
+export DEEPSEEK_API_KEY=a
+OPENROUTER_API_KEY="quoted"
+ GITHUB_TOKEN=indented
+EOF
+run_agent
+check_has "wrapper: only plain KEY=value lines count" "$run_log" '^keys=\|\|$'
+
+# wrong mode: nothing is read, the agent still runs
+for mode in 644 640 604 660 666; do
+  write_env "$mode" <<'EOF'
+DEEPSEEK_API_KEY=ds-key
+OPENROUTER_API_KEY=or-key
+GITHUB_TOKEN=gh-key
+EOF
+  run_agent
+  check_has "wrapper: mode $mode exports nothing" "$run_log" '^keys=\|\|$'
+done
+
+# a symlink to a good file: nothing is read
+rm -f "$env_file"
+(umask 077 && printf 'DEEPSEEK_API_KEY=via-link\nGITHUB_TOKEN=via-link\n' >"$tmp/real-env")
+ln -s "$tmp/real-env" "$env_file"
+run_agent
+check_has "wrapper: a symlinked env file exports nothing" "$run_log" '^keys=\|\|$'
+# a directory, a missing file: nothing, and no failure
+rm -f "$env_file"
+mkdir -m 700 "$env_file"
+run_agent
+check_has "wrapper: a directory exports nothing" "$run_log" '^keys=\|\|$'
+rmdir "$env_file"
+run_agent
+check_has "wrapper: no env file exports nothing" "$run_log" '^keys=\|\|$'
+
+# a key missing from the file stays unset
+write_env 600 <<'EOF'
+GITHUB_TOKEN=only-github
+EOF
+run_agent
+check_has "wrapper: each key on its own" "$run_log" '^keys=\|\|only-github$'
+rm -f "$env_file"
+
 # --- agent-hook: one event, one state
 hook() { printf '%s' "$2" | agent-hook "$1"; } # EVENT JSON
 sid=1234abcd-0000-4000-8000-000000000000
@@ -209,6 +297,35 @@ check_eq "hook with AGENT_RUN_ID keeps its window" "$(field claude-77 window)" "
 [[ ! -e $AGENT_STATUS_DIR/claude-99999999.json ]] && ok "hook with AGENT_RUN_ID makes no second row" || fail "second row for the same agent"
 printf '{"session_id":"99999999-aaaa","cwd":"/x"}' | AGENT_RUN_ID='../evil' agent-hook Stop
 check_eq "a bad AGENT_RUN_ID falls back to the session id" "$(field claude-99999999 state)" "waiting"
+
+# Ctrl-X marks the row `stopped` and kills the window; Claude Code's SessionEnd then runs. A
+# stopped row of agent-run stays stopped, on every event, and is not even rewritten.
+agent-status set --id claude-78 --agent claude --task "killed" --state stopped --pid 1 --window claude-78
+sleep 1
+before=$(cat "$AGENT_STATUS_DIR/claude-78.json")
+for ev in SessionEnd Stop Notification UserPromptSubmit SessionStart; do
+  out=$(printf '{"session_id":"88888888-aaaa","cwd":"/x"}' | AGENT_RUN_ID=claude-78 agent-hook "$ev"); rc=$?
+  check_eq "hook $ev on a stopped row: exit status" "$rc" "0"
+  check_eq "hook $ev on a stopped row: prints nothing" "$out" ""
+done
+check_eq "hook events leave a stopped row exactly as it was" "$(cat "$AGENT_STATUS_DIR/claude-78.json")" "$before"
+[[ ! -e $AGENT_STATUS_DIR/claude-88888888.json ]] && ok "hook on a stopped row makes no second row" || fail "second row for a stopped agent"
+# the other order: SessionEnd first (done), then Ctrl-X (stopped) wins, as a plain write
+agent-status set --id claude-79 --agent claude --task "ended" --state working --pid 1 --window claude-79
+printf '{"session_id":"77777777-aaaa","cwd":"/x"}' | AGENT_RUN_ID=claude-79 agent-hook SessionEnd
+check_eq "SessionEnd on a working row of agent-run -> done" "$(field claude-79 state)" "done"
+agent-status set --id claude-79 --state stopped
+check_eq "stopped after done stays stopped" "$(field claude-79 state)" "stopped"
+# only `stopped` blocks the hook: waiting, failed and done rows are still updated
+for st in waiting failed done lost; do
+  agent-status set --id claude-80 --agent claude --task "t" --state "$st" --pid 1 --window claude-80
+  printf '{"session_id":"66666666-aaaa","cwd":"/x"}' | AGENT_RUN_ID=claude-80 agent-hook UserPromptSubmit
+  check_eq "hook updates a $st row" "$(field claude-80 state)" "working"
+done
+# an unreadable row is not `stopped`: the hook writes it
+printf 'not json' >"$AGENT_STATUS_DIR/claude-81.json"
+printf '{"session_id":"55555555-aaaa","cwd":"/x"}' | AGENT_RUN_ID=claude-81 agent-hook Stop
+check_eq "hook rewrites an unreadable row" "$(field claude-81 state)" "waiting"
 
 # garbage: exit 0, nothing written, nothing printed
 snapshot() { ls -A "$AGENT_STATUS_DIR" | grep -v '^\.' | sort | paste -sd,; }

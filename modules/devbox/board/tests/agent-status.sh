@@ -237,6 +237,54 @@ check_rc "remote: AGENT_STATUS_DIR set by caller" 0 \
 [[ -f $default/e1.json ]] && ok "remote: row went to the default dir" || fail "remote: no row in $default"
 [[ ! -e $redirect ]] && ok "remote: AGENT_STATUS_DIR ignored" || fail "remote: wrote to the caller's AGENT_STATUS_DIR"
 
+# --- agent-status-remote: a remote key cannot overwrite a row of this machine
+# Local rows (made by the devbox itself) in the directory the remote key writes to.
+local_set() { env AGENT_STATUS_DIR="$rdir" agent-status set "$@"; }
+local_set --id loc1 --agent claude --task "mine" --state working --pid 1 --window loc1
+local_set --id loc2 --agent claude --task "hook row" --machine devbox --state working
+local_set --id loc3 --agent claude --task "upper" --machine "${me^^}" --state working
+local_set --id loc4 --agent claude --task "fqdn" --machine "${me%%.*}.example.com" --state working
+hijacked() { # NAME ID
+  local before after err rc
+  before=$(cat "$rdir/$2.json")
+  err=$(SSH_ORIGINAL_COMMAND="agent-status set --id $2 --machine thinkpad --agent claude --state done --task hijack --window evil --log /etc/passwd" agent-status-remote 2>&1 >/dev/null)
+  rc=$?
+  after=$(cat "$rdir/$2.json")
+  check_eq "remote overwrite of local row ($1): exit 2" "$rc" "2"
+  [[ -n $err && $(wc -l <<<"$err") -eq 1 ]] && ok "remote overwrite of local row ($1): one-line message" || fail "remote overwrite of local row ($1): message was '$err'"
+  check_eq "remote overwrite of local row ($1): row unchanged" "$after" "$before"
+}
+hijacked own-hostname loc1
+hijacked devbox loc2
+hijacked hostname-upper loc3
+hijacked first-label loc4
+# the same guard through agent-status itself
+before=$(cat "$rdir/loc1.json")
+check_rc "agent-status set --remote on a local row" 2 env AGENT_STATUS_DIR="$rdir" agent-status set --remote --id loc1 --machine thinkpad --state done
+check_eq "agent-status set --remote leaves a local row alone" "$(cat "$rdir/loc1.json")" "$before"
+# a row without a machine field is a local row too
+printf '{"id":"loc5","state":"working"}\n' >"$rdir/loc5.json"
+check_rc "remote overwrite of a row without machine" 2 remote "agent-status set --id loc5 --machine thinkpad --state done"
+check_eq "row without machine stays as it was" "$(cat "$rdir/loc5.json")" '{"id":"loc5","state":"working"}'
+# remote rows stay writable: a new id, an existing remote row, another remote machine
+check_rc "remote set on a new id" 0 remote "agent-status set --id fresh --machine thinkpad --state working"
+check_rc "remote set on an existing remote row" 0 remote "agent-status set --id fresh --machine thinkpad --state done"
+check_eq "remote update applied" "$(jq -r .state "$rdir/fresh.json")" "done"
+check_rc "remote set moves a remote row to another remote machine" 0 remote "agent-status set --id fresh --machine tablet --state waiting"
+check_eq "remote row machine moved" "$(jq -r .machine "$rdir/fresh.json")" "tablet"
+# a local set is not affected by the guard
+check_rc "local set on a local row" 0 local_set --id loc1 --state waiting
+check_eq "local set applied" "$(jq -r .state "$rdir/loc1.json")" "waiting"
+# the caller cannot pass --remote: it is rejected like an unknown flag, nothing is written
+before=$(find "$rdir" -name '*.json' | sort | xargs cat | cksum)
+check_rc "remote: --remote as a flag" 2 remote "agent-status set --id x2 --machine thinkpad --remote 1"
+check_rc "remote: --remote first" 2 remote "agent-status set --remote 1 --machine thinkpad --id x3"
+check_rc "remote: bare --remote (odd words)" 2 remote "agent-status set --remote --machine thinkpad --id x1 --state done"
+check_rc "remote: --remote to unlock a local row" 2 remote "agent-status set --id loc2 --machine thinkpad --remote 0 --state done"
+check_eq "remote: --remote attempts wrote nothing" "$(find "$rdir" -name '*.json' | sort | xargs cat | cksum)" "$before"
+check_rc "remote: --remote as a value is only text" 0 remote "agent-status set --id x4 --machine thinkpad --task --remote"
+check_eq "remote: --remote value kept" "$(jq -r .task "$rdir/x4.json")" "--remote"
+
 echo
 if (( fails > 0 )); then echo "$fails test(s) failed" >&2; exit 1; fi
 echo "all tests passed"

@@ -264,22 +264,89 @@ agent-status set --id board --window other:w0 --state working
 board _kill board 2>/dev/null
 check_has "Ctrl-X never kills the board window" "$(windows devbox)" '(^|,)board(,|$)'
 check_eq "Ctrl-X on board leaves the row alone" "$(jq -r .state "$AGENT_STATUS_DIR/board.json")" "working"
-# A row file whose .id is not its file name is no row: a.json saying "b" touches nothing of b.
+# A row file whose .id is not its file name is no row: a.json saying "b" touches nothing of b,
+# nor of a. Both windows exist, so a Ctrl-X that trusted the argument (a) or the file (b) would
+# kill one of them.
+has_window() { windows devbox | tr ',' '\n' | grep -cx -- "$1" || true; }
+tmux new-window -d -t '=devbox:' -n a 'sleep 600'
 tmux new-window -d -t '=devbox:' -n b 'sleep 600'
 agent-status set --id b --state working --log "$AGENT_STATUS_DIR/logs/ok.log"
 printf '{"id":"b","state":"working","log":"%s/logs/ok.log"}\n' "$AGENT_STATUS_DIR" >"$AGENT_STATUS_DIR/a.json"
 board _kill a 2>/dev/null
-check_has "mismatched id: Ctrl-X on a does not kill devbox:b" "$(windows devbox)" '(^|,)b(,|$)'
+check_eq "mismatched id: Ctrl-X on a does not kill devbox:a" "$(has_window a)" "1"
+check_eq "mismatched id: Ctrl-X on a does not kill devbox:b" "$(has_window b)" "1"
 check_eq "mismatched id: row b is not stopped" "$(jq -r .state "$AGENT_STATUS_DIR/b.json")" "working"
 check_eq "mismatched id: a.json is left alone" "$(jq -r .state "$AGENT_STATUS_DIR/a.json")" "working"
 check_eq "mismatched id: no log is opened for a" "$(timeout 5 board _log a </dev/null 2>/dev/null)" ""
 check_eq "mismatched id: Enter on a opens nothing" "$(timeout 5 board _enter a </dev/null 2>/dev/null)" ""
 board _kill b 2>/dev/null
-check_eq "matching id: Ctrl-X on b kills devbox:b" "$(windows devbox | tr ',' '\n' | grep -cx b || true)" "0"
+check_eq "matching id: Ctrl-X on b kills devbox:b" "$(has_window b)" "0"
+check_eq "matching id: Ctrl-X on b leaves devbox:a" "$(has_window a)" "1"
 check_eq "matching id: row b is stopped" "$(jq -r .state "$AGENT_STATUS_DIR/b.json")" "stopped"
 board _kill '../x' 2>/dev/null
 board _kill nosuchrow 2>/dev/null
 [[ ! -e $AGENT_STATUS_DIR/nosuchrow.json ]] && ok "Ctrl-X on an unknown id creates no row" || fail "Ctrl-X created a row"
+
+# --- Ctrl-X marks the row stopped BEFORE it kills the window: Claude Code's SessionEnd hook runs
+# after the kill and must find `stopped` (agent-hook leaves it). The window records the row's
+# state at the moment the kill reaches it.
+agent-status set --id ord --state working --window ord
+cat >"$tmp/hup.sh" <<EOF
+trap 'jq -r .state "$AGENT_STATUS_DIR/ord.json" >"$tmp/state-at-kill"; exit 0' HUP TERM
+sleep 600 &
+wait
+EOF
+tmux new-window -d -t '=devbox:' -n ord "bash $tmp/hup.sh"
+sleep 0.5 # the trap is in place
+board _kill ord 2>/dev/null
+for _ in $(seq 1 50); do [[ -s $tmp/state-at-kill ]] && break; sleep 0.1; done
+check_eq "Ctrl-X: the row is stopped when the window is killed" "$(cat "$tmp/state-at-kill" 2>/dev/null)" "stopped"
+check_eq "Ctrl-X: the window is gone" "$(has_window ord)" "0"
+
+# --- a row of another machine, or a row without a window of its own: Enter and Ctrl-X change
+# nothing. A tmux window that happens to be named like the remote id (zsh) is not the agent.
+tmux select-window -t '=devbox:board'
+tmux new-window -d -t '=devbox:' -n zsh 'sleep 600'
+tmux select-window -t '=devbox:board'
+agent-status set --id zsh --machine laptop --task "remote one" --state working
+before=$(cat "$AGENT_STATUS_DIR/zsh.json")
+board _enter zsh 2>"$tmp/err"
+check_eq "Enter on a remote row selects nothing" "$(active devbox)" "board"
+check_eq "Enter on a remote row: one-line message" "$(wc -l <"$tmp/err")" "1"
+board _kill zsh 2>"$tmp/err"
+check_eq "Ctrl-X on a remote row keeps the window of the same name" "$(has_window zsh)" "1"
+check_eq "Ctrl-X on a remote row leaves the row as it was" "$(cat "$AGENT_STATUS_DIR/zsh.json")" "$before"
+check_eq "Ctrl-X on a remote row: one-line message" "$(wc -l <"$tmp/err")" "1"
+# machine names of this host count as local: hostname in any case, the first label, `devbox`
+me=$(cat /proc/sys/kernel/hostname)
+for m in "$me" "${me^^}" devbox DevBox "${me%%.*}.example.com"; do
+  tmux new-window -d -t '=devbox:' -n loc 'sleep 600'
+  agent-status set --id loc --machine "$m" --state working
+  tmux select-window -t '=devbox:board'
+  board _enter loc 2>/dev/null
+  check_eq "Enter on a row of machine '$m' selects the window" "$(active devbox)" "loc"
+  board _kill loc 2>/dev/null
+  check_eq "Ctrl-X on a row of machine '$m' kills the window" "$(has_window loc)" "0"
+  check_eq "Ctrl-X on a row of machine '$m' marks it stopped" "$(jq -r .state "$AGENT_STATUS_DIR/loc.json")" "stopped"
+done
+# a local row with no window: nothing to select, nothing to kill, and no `stopped` mark
+tmux select-window -t '=devbox:board'
+agent-status set --id nowin --state working
+before=$(cat "$AGENT_STATUS_DIR/nowin.json")
+board _enter nowin 2>/dev/null
+check_eq "Enter on a local row without a window selects nothing" "$(active devbox)" "board"
+board _kill nowin 2>"$tmp/err"
+check_eq "Ctrl-X on a local row without a window changes nothing" "$(cat "$AGENT_STATUS_DIR/nowin.json")" "$before"
+check_eq "Ctrl-X on a local row without a window: one-line message" "$(wc -l <"$tmp/err")" "1"
+# the same row of a remote machine, with a window of the same name: still nothing
+tmux new-window -d -t '=devbox:' -n rwin 'sleep 600'
+tmux select-window -t '=devbox:board'
+agent-status set --id rwin --machine laptop --state working
+board _enter rwin 2>/dev/null
+board _kill rwin 2>/dev/null
+check_eq "remote row with a window of its name: Enter selects nothing" "$(active devbox)" "board"
+check_eq "remote row with a window of its name: the window survives" "$(has_window rwin)" "1"
+check_eq "remote row with a window of its name: no stopped mark" "$(jq -r .state "$AGENT_STATUS_DIR/rwin.json")" "working"
 
 echo
 if ((fails > 0)); then echo "$fails test(s) failed" >&2; exit 1; fi

@@ -65,7 +65,7 @@ in
         opens22 = i: lib.elem 22 i.allowedTCPPorts
           || lib.any (r: r.from <= 22 && 22 <= r.to) i.allowedTCPPortRanges;
         tsFlags = guest.services.tailscale.extraUpFlags ++ guest.services.tailscale.extraSetFlags;
-        rules22 =lib.length (lib.splitString "dport 22" fw.extraInputRules) - 1;
+        rules22 = lib.length (lib.splitString "dport 22" fw.extraInputRules) - 1;
       in
       # sshd: no automatic firewall hole, only abel, keys only.
       assert ssh.openFirewall == false;
@@ -88,6 +88,7 @@ in
       assert guest.systemd.services ? tailscaled-autoconnect;
       assert lib.elem "--login-server=https://hs.abe.lc" guest.services.tailscale.extraUpFlags;
       assert lib.elem "--hostname=devbox" guest.services.tailscale.extraUpFlags;
+      assert lib.elem "--accept-dns=false" guest.services.tailscale.extraUpFlags;
       assert lib.elem "--accept-dns=false" guest.services.tailscale.extraSetFlags;
       assert !(lib.any (lib.hasInfix "operator") tsFlags);
       assert !(lib.any (lib.hasInfix "advertise-tags") tsFlags);

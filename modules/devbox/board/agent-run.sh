@@ -22,10 +22,38 @@ die() {
   exit "${2:-2}"
 }
 
+# load_env: tmux runs the window command in a non-interactive shell, so devbox-load-env (an
+# interactive zsh function) never runs for an agent. This reads $XDG_RUNTIME_DIR/devbox-env, the
+# file of devbox-secrets, with the same strict text parse as board/devbox-env.zsh: it is never
+# sourced; it must be a regular file (not a link) owned by this user with no group/world bit; only
+# the three known keys are exported, each from its first line, and only when the value matches
+# [A-Za-z0-9_.-]+. Anything else (another key, PATH=..., a bad file) is ignored, silently.
+load_env() {
+  local file=${XDG_RUNTIME_DIR:-}/devbox-env line key value mode
+  local -A seen=()
+  [[ -n ${XDG_RUNTIME_DIR:-} && -f $file && ! -L $file && -O $file ]] || return 0
+  mode=$(stat -c %a -- "$file" 2>/dev/null) || return 0
+  [[ $mode =~ ^[0-7]{3,4}$ ]] || return 0
+  (((8#$mode & 8#077) == 0)) || return 0
+  while IFS= read -r line || [[ -n $line ]]; do
+    case $line in
+      DEEPSEEK_API_KEY=* | OPENROUTER_API_KEY=* | GITHUB_TOKEN=*) ;;
+      *) continue ;;
+    esac
+    key=${line%%=*}
+    value=${line#*=}
+    [[ -z ${seen[$key]:-} ]] || continue
+    seen[$key]=1
+    [[ $value =~ ^[A-Za-z0-9_.-]+$ ]] || continue
+    export "$key=$value"
+  done <"$file" 2>/dev/null || true
+}
+
 # _wrap ID AGENT: runs inside the tmux window, started by cmd_start. cwd is the agent's directory.
 cmd_wrap() {
   local id=$1 agent=$2 log final rc=0
   log=$dir/$id.log
+  load_env
   export AGENT_RUN_ID=$id # agent-hook updates this row instead of making a second one
   agent-status set --id "$id" --state working --pid "$$" --window "$id" --log "$log" || true
   # The single quotes are on purpose: script's shell expands $AGENT_RUN_TASK, this one does not.
