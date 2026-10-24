@@ -26,6 +26,14 @@ in
     ];
 
     programs.zsh.enable = true;
+    # An interactive SSH login lands in the tmux session `devbox` (board in window 0). Anything
+    # else keeps its shell untouched: scp, rsync and `ssh devbox cmd` have no terminal on stdin
+    # and are not interactive logins, and a shell already in tmux must not nest another.
+    programs.zsh.loginShellInit = ''
+      if [[ -o interactive && -o login && -t 0 && -n $SSH_CONNECTION && -z $TMUX ]]; then
+        exec devbox-session
+      fi
+    '';
     users.users.abel = {
       isNormalUser = true;
       uid = 1000;
