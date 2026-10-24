@@ -14,6 +14,7 @@ in
       topModules.devbox-tools
       topModules.devbox-board
       topModules.devbox-jobs
+      topModules.devbox-secrets
       # Read from the topology; an option only so that the eval check can override it.
       ({ lib, node, ... }: {
         options.devbox.statusKey = lib.mkOption {
