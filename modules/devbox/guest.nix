@@ -8,7 +8,7 @@ let
 in
 {
   flake.modules.nixos.devbox-guest = { config, pkgs, ... }: {
-    imports = [ topModules.devbox-network ];
+    imports = [ topModules.devbox-network topModules.devbox-tools ];
 
     microvm.shares = [
       {
