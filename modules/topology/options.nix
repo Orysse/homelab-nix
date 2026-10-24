@@ -191,5 +191,32 @@ in
         };
       });
     };
+
+    # Development VMs: like the nodes, but outside k3s (no role, no data volume).
+    devboxes = mkOption {
+      default = { };
+      description = "Dev VMs on a physical host (microVM, not part of the cluster).";
+      type = types.attrsOf (types.submodule {
+        options = {
+          inherit address;
+          host = mkOption { type = types.str; };
+          mem = mkOption {
+            type = types.ints.positive;
+            description = "RAM in MB (reserved on the host).";
+          };
+          vcpu = mkOption { type = types.ints.positive; };
+          balloon = mkOption {
+            type = types.bool;
+            default = false;
+            description = "virtio-balloon with free page reporting (microvm.balloon).";
+          };
+          statusKey = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "Public SSH key allowed to run the status command on the devbox (forced command). null: none.";
+          };
+        };
+      });
+    };
   };
 }

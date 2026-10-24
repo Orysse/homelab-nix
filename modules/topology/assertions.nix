@@ -22,5 +22,18 @@ in
       pkgs.runCommand "topology-rejects-duplicate-ip" { } ''
         echo ${lib.escapeShellArg (toString errors)} > $out
       '';
+
+    # Negative test: a devbox may not reuse a node's IP.
+    checks.topology-rejects-devbox-ip-clash =
+      let
+        good = cluster;
+        bad = lib.recursiveUpdate good { devboxes.devbox.address = good.nodes.kube-2.address; };
+        errors = clusterLib.validate bad;
+      in
+      assert clusterLib.validate good == [ ];
+      assert lib.any (lib.hasPrefix "duplicate IPs") errors;
+      pkgs.runCommand "topology-rejects-devbox-ip-clash" { } ''
+        echo ${lib.escapeShellArg (toString errors)} > $out
+      '';
   };
 }

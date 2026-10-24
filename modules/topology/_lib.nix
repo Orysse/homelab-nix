@@ -23,10 +23,15 @@ let
     let
       nodeNames = lib.attrNames cluster.nodes;
       nodes = lib.attrValues cluster.nodes;
+      devboxNames = lib.attrNames cluster.devboxes;
+      devboxes = lib.attrValues cluster.devboxes;
       allIps = lib.filter (ip: ip != null)
-        (map (h: h.address) (lib.attrValues cluster.hosts) ++ map (n: n.address) nodes);
+        (map (h: h.address) (lib.attrValues cluster.hosts)
+          ++ map (n: n.address) nodes
+          ++ map (d: d.address) devboxes);
       dupIps = duplicates allIps;
-      dupMacs = duplicates (map macOf nodeNames);
+      # Nodes and devboxes share the tap and MAC namespace.
+      dupMacs = duplicates (map macOf (nodeNames ++ devboxNames));
       net = cluster.network;
       staticReady = net.subnet != null && net.prefixLength != null && net.gateway != null;
     in
@@ -43,9 +48,18 @@ let
         "node name longer than 12 characters (tap ${tapOf name} > 15): ${name}"
       ++ lib.optional (!cluster.hosts ? ${n.host})
         "node ${name} refers to an unknown host: ${n.host}"
-    ) nodeNames;
+    ) nodeNames
+    ++ lib.concatMap (name:
+      let d = cluster.devboxes.${name}; in
+      lib.optional (lib.stringLength name > 12)
+        "devbox name longer than 12 characters (tap ${tapOf name} > 15): ${name}"
+      ++ lib.optional (!cluster.hosts ? ${d.host})
+        "devbox ${name} refers to an unknown host: ${d.host}"
+    ) devboxNames;
 
   nodesOn = cluster: hostName: lib.filterAttrs (_: n: n.host == hostName) cluster.nodes;
+
+  devboxesOn = cluster: hostName: lib.filterAttrs (_: d: d.host == hostName) cluster.devboxes;
 
   servers = cluster: lib.sort lib.lessThan
     (lib.attrNames (lib.filterAttrs (_: n: n.role == "server") cluster.nodes));
@@ -69,5 +83,5 @@ let
     });
 in
 {
-  inherit macOf tapOf validate nodesOn servers bootstrapServer endpointOf lanNetworkConfig;
+  inherit macOf tapOf validate nodesOn devboxesOn servers bootstrapServer endpointOf lanNetworkConfig;
 }
