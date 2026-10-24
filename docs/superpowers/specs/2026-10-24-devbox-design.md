@@ -24,7 +24,8 @@ tasks with agents belongs to the same system. This is not about token or cost da
 - Tools: tmux, git, claude-code, opencode, vim. tmux and vim come from the owner's
   public `~/config` flake (`github:Orysse/config`, packages `tmux` and `nvim`) used as a
   flake input. Only those packages are used, not its NixOS modules.
-- The tmux layout is the "agent board": window 0 lists every agent (name, machine, task,
+- The tmux layout is the "agent board": the first window, named `board` (index 1 with the
+  owner's `base-index 1`; the name is what matters), lists every agent (name, machine, task,
   state, time in that state); Enter jumps into that agent's window; keys to start, stop and
   read logs. Each agent has its own tmux window.
 
@@ -36,7 +37,7 @@ tasks with agents belongs to the same system. This is not about token or cost da
 
 ## Goals
 
-- `ssh devbox` from any tailnet machine gives a working tmux with the board in window 0.
+- `ssh devbox` from any tailnet machine gives a working tmux with the board in its first window (named `board`).
 - A tmux session survives disconnects. After a VM restart, the home directory is intact
   and the board shows what was running.
 - The VM can be destroyed and rebuilt from code with nothing lost.
@@ -123,7 +124,7 @@ by hand and persists in the home directory.
 
 Status lives in plain files first, no service. Each agent has a JSON file in
 `~/.local/state/agents/` with name, machine, task, state (working, waiting, done, failed,
-scheduled), start time and last update. A small TUI in tmux window 0 (fzf-based or a
+scheduled), start time and last update. A small TUI in the first tmux window, named `board` (fzf-based or a
 short script) reads them, shows the table, and on Enter attaches to the agent's tmux
 window or opens its log. Keys start a new agent window and stop one.
 
