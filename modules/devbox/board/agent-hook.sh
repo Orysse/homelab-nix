@@ -13,6 +13,8 @@ export LC_ALL=C.UTF-8
 
 hook() {
   local event=${1:-} state input session cwd id task
+  # A scheduled job (job-triage) has its own row and sets this for its claude: no second row.
+  if [[ ${AGENT_HOOK_DISABLE:-} == 1 ]]; then return 0; fi
   case $event in
     SessionStart | UserPromptSubmit) state=working ;;
     Notification | Stop) state=waiting ;;

@@ -184,6 +184,17 @@ for pair in Notification:waiting Stop:waiting UserPromptSubmit:working SessionEn
 done
 check_eq "later events keep the task" "$(field claude-1234abcd task)" "claude in /home/abel/work/x"
 
+# AGENT_HOOK_DISABLE=1 (set by job-triage for its claude): no row, no output, exit 0, on every event.
+for ev in SessionStart UserPromptSubmit Notification Stop SessionEnd; do
+  out=$(printf '{"session_id":"d15ab1ed-0000","cwd":"/x"}' | AGENT_HOOK_DISABLE=1 agent-hook "$ev"); rc=$?
+  check_eq "AGENT_HOOK_DISABLE=1 $ev: exit status" "$rc" "0"
+  check_eq "AGENT_HOOK_DISABLE=1 $ev: prints nothing" "$out" ""
+done
+[[ ! -e $AGENT_STATUS_DIR/claude-d15ab1ed.json ]] && ok "AGENT_HOOK_DISABLE=1 writes no row" || fail "a row was written with AGENT_HOOK_DISABLE=1"
+# any other value, or none, behaves as before
+printf '{"session_id":"d15ab1ed-0000","cwd":"/x"}' | AGENT_HOOK_DISABLE=0 agent-hook SessionStart
+check_eq "AGENT_HOOK_DISABLE=0 still writes the row" "$(field claude-d15ab1ed state)" "working"
+
 # the id is claude-<first 8 characters of session_id>, lower case
 hook SessionStart '{"session_id":"ABCDEF12-3456","cwd":"/x"}'
 check_eq "id is lower case, 8 characters" "$(field claude-abcdef12 state)" "working"

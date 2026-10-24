@@ -36,6 +36,7 @@ cat >"$stubs/claude" <<EOF
 #!$sh
 echo called >>"\$HOME/claude-calls"
 printf '%s\n' "\$@" >"\$HOME/claude-args"
+printf '%s\n' "token=\${GITHUB_TOKEN-unset}" "hook-disable=\${AGENT_HOOK_DISABLE-unset}" >"\$HOME/claude-env"
 cat >"\$HOME/claude-stdin"
 [[ -r \$HOME/stub-exit ]] && exit "\$(<"\$HOME/stub-exit")"
 echo "# Renovate triage"
@@ -66,7 +67,7 @@ cat >"$HOME/pulls.json" <<'EOF'
 EOF
 
 field() { jq -r ".$1" "$AGENT_STATUS_DIR/job-triage.json" 2>/dev/null; }
-reset() { rm -rf "$HOME/claude-calls" "$HOME/claude-args" "$HOME/claude-stdin" "$HOME/curl-calls" "$HOME/curl-args" "$HOME/curl-stdin" "$HOME/stub-exit" "$HOME/curl-exit" "$HOME/reports" "$AGENT_STATUS_DIR" "$XDG_RUNTIME_DIR/devbox-env"; }
+reset() { rm -rf "$HOME/claude-env" "$HOME/pwned" "$tmp/pwned" "$HOME/claude-calls" "$HOME/claude-args" "$HOME/claude-stdin" "$HOME/curl-calls" "$HOME/curl-args" "$HOME/curl-stdin" "$HOME/stub-exit" "$HOME/curl-exit" "$HOME/reports" "$AGENT_STATUS_DIR" "$XDG_RUNTIME_DIR/devbox-env"; }
 today=$(date +%F)
 
 # --- high memory pressure: skipped, nothing called
@@ -118,7 +119,17 @@ else
 fi
 check_has "claude never asks for permission" "$args" '^--permission-prompts$'
 check_has "claude does not keep a session" "$args" '^--no-session-persistence$'
-check_lacks "claude is not given dangerous flags" "$args" 'dangerously|bypassPermissions|acceptEdits|allowedTools'
+check_lacks "claude is not given dangerous flags" "$args" 'dangerously|bypassPermissions|acceptEdits|allowedTools|--mcp-config'
+check_has "claude takes no MCP server (--strict-mcp-config)" "$args" '^--strict-mcp-config$'
+sources_at=-1
+for i in "${!argv[@]}"; do [[ ${argv[$i]} == --setting-sources ]] && sources_at=$i; done
+if ((sources_at >= 0)); then
+  check_eq "claude loads no settings source (--setting-sources '')" "${argv[sources_at + 1]-unset}" ""
+else
+  fail "claude is not given --setting-sources"
+fi
+check_eq "claude does not inherit the token" "$(sed -n 1p "$HOME/claude-env")" "token=unset"
+check_eq "claude runs with the agent hook disabled" "$(sed -n 2p "$HOME/claude-env")" "hook-disable=1"
 check_has "the prompt says read-only" "$args" 'read-only|Do not'
 check_has "claude gets the Renovate PR" "$(cat "$HOME/claude-stdin")" '"number": ?41'
 check_lacks "claude does not get other PRs" "$(cat "$HOME/claude-stdin")" '"number": ?42'
@@ -128,11 +139,86 @@ check_has "the token reaches curl on stdin" "$(cat "$HOME/curl-stdin")" 'secret-
 check_has "curl asks for the repository" "$(cat "$HOME/curl-args")" 'Orysse/homelab-nix/pulls'
 
 # --- the credential comes from $XDG_RUNTIME_DIR/devbox-env when the environment has none
+envfile=$XDG_RUNTIME_DIR/devbox-env
+# write_env MODE TEXT: a devbox-env file of this mode
+write_env() { rm -f "$envfile"; (umask 0; printf '%s' "$2" >"$envfile"); chmod "$1" "$envfile"; }
+
 reset
-printf 'GITHUB_TOKEN=from-env-file\n' >"$XDG_RUNTIME_DIR/devbox-env"
+write_env 600 $'OTHER=1\nGITHUB_TOKEN=from-env-file\nBAO_ADDR=x\n'
 job-triage
 check_eq "token from devbox-env: done" "$(field state)" "done"
 check_has "token from devbox-env reaches curl" "$(cat "$HOME/curl-stdin")" 'from-env-file'
+check_eq "token from devbox-env: not inherited by claude" "$(sed -n 1p "$HOME/claude-env")" "token=unset"
+
+# the first GITHUB_TOKEN= line wins, the value is what follows the first =
+reset
+write_env 600 $'GITHUB_TOKEN=first.token_1\nGITHUB_TOKEN=second\n'
+job-triage
+check_has "first GITHUB_TOKEN line is used" "$(cat "$HOME/curl-stdin")" 'first.token_1'
+check_lacks "second GITHUB_TOKEN line is ignored" "$(cat "$HOME/curl-stdin")" 'second'
+
+# the environment wins over the file
+reset
+write_env 600 $'GITHUB_TOKEN=from-file\n'
+GITHUB_TOKEN=from-env job-triage
+check_has "environment token wins" "$(cat "$HOME/curl-stdin")" 'from-env'
+check_lacks "environment token wins over the file" "$(cat "$HOME/curl-stdin")" 'from-file'
+
+# hostile file: nothing is executed, other variables are not imported, the row is updated
+hostile() { # NAME TEXT WANT_TASK_PATTERN
+  reset
+  write_env 600 "$2"
+  PATH_BEFORE=$PATH
+  job-triage; rc=$?
+  check_eq "hostile $1: exit status" "$rc" "0"
+  check_eq "hostile $1: state failed" "$(field state)" "failed"
+  check_has "hostile $1: task" "$(field task)" "$3"
+  [[ ! -e $HOME/pwned && ! -e $tmp/pwned && ! -e ./pwned ]] && ok "hostile $1: nothing executed" || fail "hostile $1: a command ran"
+  check_eq "hostile $1: claude not called" "$(cat "$HOME/claude-calls" 2>/dev/null)" ""
+  check_eq "hostile $1: curl not called" "$(cat "$HOME/curl-calls" 2>/dev/null)" ""
+  check_eq "hostile $1: PATH untouched" "$PATH" "$PATH_BEFORE"
+}
+hostile command-substitution "GITHUB_TOKEN=\$(touch $HOME/pwned)"$'\n' 'unexpected shape'
+hostile backticks "GITHUB_TOKEN=\`touch $HOME/pwned\`"$'\n' 'unexpected shape'
+hostile spaces $'GITHUB_TOKEN=abc def\n' 'unexpected shape'
+hostile semicolon "GITHUB_TOKEN=abc;touch $HOME/pwned"$'\n' 'unexpected shape'
+hostile quotes $'GITHUB_TOKEN="abc"\n' 'unexpected shape'
+hostile export-prefix $'export GITHUB_TOKEN=abc\n' '^no GitHub credential$'
+hostile other-variables-only "PATH=$tmp/stubs:/nonexistent"$'\n'"LD_PRELOAD=/x"$'\n' '^no GitHub credential$'
+hostile first-line-bad "GITHUB_TOKEN=\$(touch $HOME/pwned)"$'\nGITHUB_TOKEN=good\n' 'unexpected shape'
+hostile empty-file '' '^no GitHub credential$'
+
+# wrong mode, wrong kind of file, missing file: the credential is absent
+for mode in 640 604 660 666 644 400; do
+  reset
+  write_env "$mode" $'GITHUB_TOKEN=valid-token\n'
+  job-triage
+  if [[ $mode == 400 ]]; then
+    check_eq "devbox-env mode $mode is accepted" "$(field state)" "done"
+  else
+    check_eq "devbox-env mode $mode: state failed" "$(field state)" "failed"
+    check_eq "devbox-env mode $mode: task" "$(field task)" "no GitHub credential"
+    check_eq "devbox-env mode $mode: curl not called" "$(cat "$HOME/curl-calls" 2>/dev/null)" ""
+  fi
+done
+reset
+rm -f "$envfile"
+job-triage
+check_eq "devbox-env missing: state failed" "$(field state)" "failed"
+check_eq "devbox-env missing: task" "$(field task)" "no GitHub credential"
+reset
+write_env 600 $'GITHUB_TOKEN=valid-token\n'
+mv "$envfile" "$tmp/real-env"
+ln -s "$tmp/real-env" "$envfile"
+job-triage
+check_eq "devbox-env symlink: state failed" "$(field state)" "failed"
+check_eq "devbox-env symlink: task" "$(field task)" "no GitHub credential"
+reset
+mkdir "$envfile"
+job-triage
+check_eq "devbox-env directory: state failed" "$(field state)" "failed"
+check_eq "devbox-env directory: task" "$(field task)" "no GitHub credential"
+rmdir "$envfile"
 
 # --- no open Renovate PR: a report, no claude call
 reset
