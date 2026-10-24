@@ -2,9 +2,14 @@
 # the user `abel`, a home and a Tailscale state that outlive the disposable root, and a
 # memory cap on the user's processes so a runaway agent cannot starve the VM.
 # Not self-sufficient: it must be imported next to microvm-guest (microvm-host does).
-_:
+{ config, ... }:
+let
+  topModules = config.flake.modules.nixos;
+in
 {
   flake.modules.nixos.devbox-guest = { config, pkgs, ... }: {
+    imports = [ topModules.devbox-network ];
+
     microvm.shares = [
       {
         source = "/srv/data/devbox/home";
