@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # devbox-session: attach the tmux session `devbox`, creating it first when it does not exist.
-# Window 0 is named `board` and runs `board`. Run by the zsh login hook (guest.nix) as
+# The first window is named `board` and runs `board` (its index follows base-index in the tmux config). Run by the zsh login hook (guest.nix) as
 # `exec devbox-session`, so on a failure it hands the terminal to a plain shell instead of
 # closing the login. Without a terminal it only makes sure the session exists.
 

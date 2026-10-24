@@ -1,7 +1,7 @@
 # The agent board: one JSON row per agent in ~/.local/state/agents, written by `agent-status`.
 # `agent-status-remote` is the forced command for the dedicated SSH key of agents on other
 # machines: it accepts one shape of command and never runs a shell. `board` is the fzf table in
-# window 0 of the tmux session `devbox`; `devbox-session` creates or attaches that session (the
+# the first window of the tmux session `devbox`; `devbox-session` creates or attaches that session (the
 # zsh login hook in guest.nix runs it). The scripts live in board/ (not .nix, so import-tree
 # skips them) and shellcheck runs on them at build time.
 # tmux and fzf are not in the runtimeInputs of board and devbox-session: they come from the PATH

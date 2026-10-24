@@ -28,6 +28,8 @@ SHELL=$(command -v bash)
 export AGENT_STATUS_DIR=$tmp/agents
 unset TMUX SSH_CONNECTION
 mkdir -p "$HOME" "$TMUX_TMPDIR" "$AGENT_STATUS_DIR"
+# The owner's tmux config sets base-index 1, so the board is window 1 on the devbox, not 0.
+echo 'set -g base-index 1' >"$HOME/.tmux.conf"
 trap 'tmux kill-server 2>/dev/null; rm -rf "$tmp"' EXIT
 
 real_fzf=$(command -v fzf)
@@ -56,7 +58,8 @@ session_up() { PATH=$stub_sleep:$base_path devbox-session; }
 session_up; rc=$?
 check_eq "devbox-session exit without a terminal" "$rc" "0"
 check_eq "session devbox exists" "$(sessions)" "devbox"
-check_eq "window 0 is board" "$(tmux list-windows -t '=devbox:' -F '#{window_index}:#{window_name}')" "0:board"
+check_eq "the board window is the first window" "$(tmux list-windows -t '=devbox:' -F '#{window_index}:#{window_name}')" "1:board"
+check_eq "base-index is 1 in this tmux (the owner's config)" "$(tmux show-options -gv base-index)" "1"
 session_up; rc=$?
 check_eq "second call exit" "$rc" "0"
 check_eq "second call makes no second session" "$(sessions)" "devbox"
@@ -170,12 +173,13 @@ board _enter claude-1 2>/dev/null
 check_eq "Enter ignores the row's window (devbox:k)" "$(active devbox)" "claude-1"
 
 tmux select-window -t '=devbox:board'
-agent-status set --id 1 --window 'devbox:k' --state working
-board _enter 1 2>/dev/null
-check_eq "id 1 is a name, not the window index 1" "$(active devbox)" "board"
-tmux new-window -d -t '=devbox:' -n 1 'sleep 600'
-board _enter 1 2>/dev/null
-check_eq "a window really named 1 is selected" "$(active devbox)" "1"
+agent-status set --id 2 --window 'devbox:k' --state working
+check_eq "claude-1 is at index 2 (base-index 1)" "$(tmux list-windows -t '=devbox:' -F '#{window_index}:#{window_name}' | grep -c '^2:claude-1$')" "1"
+board _enter 2 2>/dev/null
+check_eq "id 2 is a name, not the window index 2" "$(active devbox)" "board"
+tmux new-window -d -t '=devbox:' -n 2 'sleep 600'
+board _enter 2 2>/dev/null
+check_eq "a window really named 2 is selected" "$(active devbox)" "2"
 tmux select-window -t '=devbox:board'
 board _enter '../x' 2>/dev/null
 board _enter 'a:b' 2>/dev/null
@@ -214,6 +218,14 @@ refused traversal2 "$AGENT_STATUS_DIR/logs/../../secret.txt"
 refused sibling "$tmp/agents-evil/x.log"
 refused dir-symlink "$AGENT_STATUS_DIR/dirlink/secret.txt"
 refused fifo "$AGENT_STATUS_DIR/fifo.log"
+# A FIFO at the log path must not hang the open (no writer will ever come): exit 124 = timeout.
+timeout 5 board _log ref-fifo </dev/null >/dev/null 2>&1; rc=$?
+check_eq "FIFO log is refused without hanging" "$rc" "0"
+# The same through a link that stays inside the status directory.
+ln -s "$AGENT_STATUS_DIR/fifo.log" "$AGENT_STATUS_DIR/link-fifo.log"
+refused fifo-link "$AGENT_STATUS_DIR/link-fifo.log"
+timeout 5 board _log ref-fifo-link </dev/null >/dev/null 2>&1; rc=$?
+check_eq "FIFO behind a link is refused without hanging" "$rc" "0"
 refused directory "$AGENT_STATUS_DIR/logs"
 refused relative "logs/ok.log"
 refused missing "$AGENT_STATUS_DIR/logs/none.log"
@@ -252,6 +264,19 @@ agent-status set --id board --window other:w0 --state working
 board _kill board 2>/dev/null
 check_has "Ctrl-X never kills the board window" "$(windows devbox)" '(^|,)board(,|$)'
 check_eq "Ctrl-X on board leaves the row alone" "$(jq -r .state "$AGENT_STATUS_DIR/board.json")" "working"
+# A row file whose .id is not its file name is no row: a.json saying "b" touches nothing of b.
+tmux new-window -d -t '=devbox:' -n b 'sleep 600'
+agent-status set --id b --state working --log "$AGENT_STATUS_DIR/logs/ok.log"
+printf '{"id":"b","state":"working","log":"%s/logs/ok.log"}\n' "$AGENT_STATUS_DIR" >"$AGENT_STATUS_DIR/a.json"
+board _kill a 2>/dev/null
+check_has "mismatched id: Ctrl-X on a does not kill devbox:b" "$(windows devbox)" '(^|,)b(,|$)'
+check_eq "mismatched id: row b is not stopped" "$(jq -r .state "$AGENT_STATUS_DIR/b.json")" "working"
+check_eq "mismatched id: a.json is left alone" "$(jq -r .state "$AGENT_STATUS_DIR/a.json")" "working"
+check_eq "mismatched id: no log is opened for a" "$(timeout 5 board _log a </dev/null 2>/dev/null)" ""
+check_eq "mismatched id: Enter on a opens nothing" "$(timeout 5 board _enter a </dev/null 2>/dev/null)" ""
+board _kill b 2>/dev/null
+check_eq "matching id: Ctrl-X on b kills devbox:b" "$(windows devbox | tr ',' '\n' | grep -cx b || true)" "0"
+check_eq "matching id: row b is stopped" "$(jq -r .state "$AGENT_STATUS_DIR/b.json")" "stopped"
 board _kill '../x' 2>/dev/null
 board _kill nosuchrow 2>/dev/null
 [[ ! -e $AGENT_STATUS_DIR/nosuchrow.json ]] && ok "Ctrl-X on an unknown id creates no row" || fail "Ctrl-X created a row"

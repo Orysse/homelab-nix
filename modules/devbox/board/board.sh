@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# board: fzf table over `agent-status list`, run in window 0 of the tmux session `devbox`.
+# board: fzf table over `agent-status list`, run in the first window of the tmux session `devbox`.
 #   board                       the table (Enter jump, Ctrl-L log, Ctrl-N new agent, Ctrl-X stop)
 # fzf calls this script back with the internal subcommands _list, _enter ID, _log ID, _kill ID, _new.
 #
@@ -29,10 +29,13 @@ valid_id() {
   [[ ${1:-} =~ ^[a-z0-9][a-z0-9._-]{0,63}$ ]]
 }
 
-# row_file ID: the path of the row, only when it is a plain file in the status directory.
+# row_file ID: the path of the row, only when it is a plain file in the status directory and its
+# own .id is ID (a file a.json that says it is b is not a row of a, nor of b).
 row_file() {
   local f=$dir/$1.json
   [[ -f $f && ! -L $f ]] || return 1
+  head -c "$max_file" "$f" 2>/dev/null |
+    jq -e --arg id "$1" 'type == "object" and .id == $id' >/dev/null || return 1
   printf '%s\n' "$f"
 }
 
@@ -72,16 +75,24 @@ open_log() {
     msg "$id: log not found"
     return 0
   fi
-  if [[ $real != "$real_dir"/* || ! -f $real ]]; then
+  if [[ $real != "$real_dir"/* ]]; then
     msg "$id: log is not a regular file under $dir, not opened"
     return 0
   fi
   # Open once, then check the open file, so a link swapped in after the check is not followed.
-  exec 8<"$real"
+  # The type is checked on the open file only: opening read-write never blocks on a FIFO (a
+  # read-only open waits for a writer), and fails on a directory. Only when the read-write open
+  # fails (a log without write permission) comes a read-only open, after a type check.
+  if ! { exec 8<>"$real"; } 2>/dev/null; then
+    if ! [[ -f $real ]] || ! { exec 8<"$real"; } 2>/dev/null; then
+      msg "$id: log cannot be opened, not opened"
+      return 0
+    fi
+  fi
   fd_path=$(realpath -e -- /proc/self/fd/8 2>/dev/null) || fd_path=""
   if [[ $fd_path != "$real_dir"/* || ! -f /proc/self/fd/8 ]]; then
     exec 8<&-
-    msg "$id: log changed while opening, not opened"
+    msg "$id: log is not a regular file under $dir, not opened"
     return 0
   fi
   # Secure mode: no shell escape, no editor, no preprocessor from the environment.
