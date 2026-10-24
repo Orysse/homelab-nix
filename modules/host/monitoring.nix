@@ -4,7 +4,8 @@
 #                          scrapes this host's exporters itself
 #   VictoriaLogs    :9428  logs, pushed by Alloy and by systemd-journal-upload (journald)
 # Alerting: alerting.nix (vmalert + Alertmanager). Dashboards: Grafana, in the cluster.
-# Both ports only accept the nodes and the devboxes; the exporters listen on localhost.
+# :8428 only accepts the nodes, :9428 the nodes and the devboxes; the exporters listen on
+# localhost.
 { config, ... }:
 let
   inherit (config) cluster;
@@ -14,12 +15,12 @@ in
     let
       domain = cluster.ingress.domain;
       host = config.networking.hostName;
-      # The nodes and the devboxes push their journal here.
-      nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes)
-        ++ lib.mapAttrsToList (_: d: d.address) cluster.devboxes;
-      fromNodes = port: lib.concatMapStrings
+      nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
+      # The devboxes only push their journal (VictoriaLogs :9428), nothing else.
+      devboxIPs = lib.mapAttrsToList (_: d: d.address) cluster.devboxes;
+      allowFrom = ips: port: lib.concatMapStrings
         (ip: "iptables -A nixos-fw -p tcp -s ${ip} --dport ${toString port} -j nixos-fw-accept\n")
-        nodeIPs;
+        ips;
       # WireGuard exporter: peers named after the topology, not their public key.
       wgNames = pkgs.writeText "wg0-names.conf" (lib.concatStrings (lib.mapAttrsToList (name: peer: ''
         [Peer]
@@ -92,6 +93,6 @@ in
         };
       };
 
-      networking.firewall.extraCommands = fromNodes 8428 + fromNodes 9428;
+      networking.firewall.extraCommands = allowFrom nodeIPs 8428 + allowFrom (nodeIPs ++ devboxIPs) 9428;
     };
 }

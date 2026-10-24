@@ -1,6 +1,7 @@
 # The devbox guest, on top of microvm-guest (VM plumbing, journal upload, zram, swappiness):
 # the user `abel`, a home and a Tailscale state that outlive the disposable root, and a
 # memory cap on the user's processes so a runaway agent cannot starve the VM.
+# Not self-sufficient: it must be imported next to microvm-guest (microvm-host does).
 _:
 {
   flake.modules.nixos.devbox-guest = { config, pkgs, ... }: {
@@ -25,7 +26,7 @@ _:
       uid = 1000;
       home = "/home/abel";
       shell = pkgs.zsh;
-      # Same keys as root (users-ssh); root login is closed elsewhere.
+      # Same keys as root (users-ssh).
       openssh.authorizedKeys.keys = config.users.users.root.openssh.authorizedKeys.keys;
     };
 
