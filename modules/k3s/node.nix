@@ -23,6 +23,13 @@ in
         mountPoint = "/var/lib/rancher";
         size = spec.dataDisk;
         fsType = "ext4";
+      } {
+        # Local PersistentVolumes (homelab-cluster's local-path provisioner): a block device,
+        # not the virtiofs /persist share, so PostgreSQL gets real fsync semantics.
+        image = "/var/lib/microvms/${node}/local.img";
+        mountPoint = "/var/lib/local-volumes";
+        size = spec.localDisk;
+        fsType = "ext4";
       }];
 
       # The kernel parameters kubelet expects with --protect-kernel-defaults (it no longer sets

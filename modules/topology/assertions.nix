@@ -23,6 +23,16 @@ in
         echo ${lib.escapeShellArg (toString errors)} > $out
       '';
 
+    # Negative test: a node's local volume must hold at least one database.
+    checks.topology-rejects-small-local-disk =
+      let
+        errors = clusterLib.validate (lib.recursiveUpdate cluster { nodes.kube-2.localDisk = 1024; });
+      in
+      assert lib.any (lib.hasPrefix "localDisk below 4096 MiB") errors;
+      pkgs.runCommand "topology-rejects-small-local-disk" { } ''
+        echo ${lib.escapeShellArg (toString errors)} > $out
+      '';
+
     # Negative test: backups must go to a host that exists.
     checks.topology-rejects-unknown-backup-host =
       let

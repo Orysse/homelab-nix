@@ -45,6 +45,8 @@ let
         "node name longer than 12 characters (tap ${tapOf name} > 15): ${name}"
       ++ lib.optional (!cluster.hosts ? ${n.host})
         "node ${name} refers to an unknown host: ${n.host}"
+      ++ lib.optional (n.localDisk < 4096)
+        "localDisk below 4096 MiB on node ${name}: ${toString n.localDisk}"
     ) nodeNames;
 
   nodesOn = cluster: hostName: lib.filterAttrs (_: n: n.host == hostName) cluster.nodes;

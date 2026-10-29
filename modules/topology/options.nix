@@ -193,6 +193,11 @@ in
             default = 32768;
             description = "Size (MiB) of the k3s data volume (/var/lib/rancher), a sparse file on the host.";
           };
+          localDisk = mkOption {
+            type = types.ints.positive;
+            default = 20480;
+            description = "Size (MiB) of the volume for local PersistentVolumes (/var/lib/local-volumes): databases and other data that must not sit on NFS. A sparse file on the host, kept across VM restarts.";
+          };
         };
       });
     };
