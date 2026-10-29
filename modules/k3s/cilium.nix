@@ -61,7 +61,11 @@ in
           l2announcements.enabled = true;
           # L2 announcements hold one lease per Service: the docs ask for a higher client rate.
           k8sClientRateLimit = { qps = 20; burst = 40; };
-          gatewayAPI.enabled = true;
+          gatewayAPI = {
+            enabled = true;
+            # Declared in homelab-cluster (network/gateways.yaml) with its access log settings.
+            gatewayClass.create = "false";
+          };
         };
       };
     };
