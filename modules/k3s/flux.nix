@@ -1,4 +1,6 @@
 # Boundary of the base: cluster content lives in homelab-cluster (Flux).
+# The Flux Operator installs and upgrades Flux from one FluxInstance, which also points it
+# at the homelab-cluster repository (GitRepository and Kustomization "flux-system").
 # cluster-vars exposes the topology to the manifests (${DOMAIN}, ${INGRESS_ADDRESS}…).
 { config, ... }:
 let
@@ -6,42 +8,39 @@ let
 in
 {
   flake.modules.nixos.k3s-bootstrap = {
-    services.k3s.autoDeployCharts.flux2 = {
-      repo = "https://fluxcd-community.github.io/helm-charts";
-      name = "flux2";
-      version = "2.19.1"; # Flux 2.9.5
-      hash = "sha256-uviFPpOhBkaZa3mePVmvY+m+HaupXV3PZh8yHNX/ppI=";
+    services.k3s.autoDeployCharts.flux-operator = {
+      repo = "oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator";
+      name = "flux-operator";
+      version = "0.62.1";
+      hash = "sha256-GTB1X1CTsljECKKLcCyXkJAoPgCLctQT9ukqSwl6uQg=";
       targetNamespace = "flux-system";
       createNamespace = true;
-      values = {
-        imageAutomationController.create = false;
-        imageReflectionController.create = false;
-      };
     };
 
-    homelab.k3s.manifests.flux-sync = [
-      {
-        apiVersion = "source.toolkit.fluxcd.io/v1";
-        kind = "GitRepository";
-        metadata = { name = "homelab-cluster"; namespace = "flux-system"; };
-        spec = {
-          interval = "1m";
+    homelab.k3s.manifests.flux-instance = [{
+      apiVersion = "fluxcd.controlplane.io/v1";
+      kind = "FluxInstance";
+      metadata = { name = "flux"; namespace = "flux-system"; };
+      spec = {
+        distribution = {
+          version = "2.9.6";
+          registry = "ghcr.io/fluxcd";
+        };
+        # No image automation: Renovate opens the version bumps as pull requests.
+        components = [
+          "source-controller"
+          "kustomize-controller"
+          "helm-controller"
+          "notification-controller"
+        ];
+        sync = {
+          kind = "GitRepository";
           url = cluster.gitops.url;
-          ref.branch = cluster.gitops.branch;
-        };
-      }
-      {
-        apiVersion = "kustomize.toolkit.fluxcd.io/v1";
-        kind = "Kustomization";
-        metadata = { name = "cluster"; namespace = "flux-system"; };
-        spec = {
-          interval = "10m";
-          sourceRef = { kind = "GitRepository"; name = "homelab-cluster"; };
+          ref = "refs/heads/${cluster.gitops.branch}";
           path = cluster.gitops.path;
-          prune = true;
         };
-      }
-    ];
+      };
+    }];
 
     homelab.k3s.manifests.cluster-vars = [{
       apiVersion = "v1";
