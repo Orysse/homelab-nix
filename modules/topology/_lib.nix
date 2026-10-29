@@ -37,6 +37,8 @@ let
     ++ lib.optionals staticReady
       (lib.concatMap (ip: lib.optional (!inSubnet net ip) "IP outside the subnet: ${ip}") allIps)
     ++ lib.optional (servers cluster == [ ]) "no node with role = \"server\""
+    ++ lib.optional (!cluster.hosts ? ${cluster.backup.host})
+      "backup.host refers to an unknown host: ${cluster.backup.host}"
     ++ lib.concatMap (name:
       let n = cluster.nodes.${name}; in
       lib.optional (lib.stringLength name > 12)

@@ -25,6 +25,8 @@
     # stay disposable.
     storage.host = "nuc1";
     monitoring.host = "nuc1";   # metrics, logs, dashboards, alerts
+    # Garage (S3) for PostgreSQL backups, until the NAS arrives (then an address, not a host).
+    backup.host = "nuc1";
     # Apps' PostgreSQL, on a local disk (SQLite on NFS corrupts). One database per
     # namespace; OpenBao owns the passwords (homelab-cluster: openbao/).
     # People log in to the Kubernetes API through Pocket-ID (clients created in its UI).

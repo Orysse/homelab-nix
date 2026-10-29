@@ -87,6 +87,11 @@ in
       };
     };
 
+    backup.host = mkOption {
+      type = types.str;
+      description = "Physical host running the S3 store (Garage) that cluster backups go to. Meant to become the NAS, which will be an address rather than a host of this topology.";
+    };
+
     monitoring.host = mkOption {
       type = types.str;
       description = "Physical host running the monitoring backends (VictoriaMetrics, VictoriaLogs, Grafana). Below the cluster: it must work when the cluster does not.";

@@ -5,6 +5,9 @@
 #   routing      native: the nodes share a LAN, pod routes go straight between them
 #   encryption   WireGuard between nodes (pod traffic never crosses the LAN in clear)
 #   Hubble       flow visibility; UI and metrics exposed by homelab-cluster
+#   LB IPs       LoadBalancer addresses from a pool, announced on the LAN (ARP)
+#   Gateway API  served by the Envoy Cilium already runs on each node (no ingress controller)
+# The pools, the Gateway and its access log format live in homelab-cluster (ADR 0002, 0003).
 { config, ... }:
 let
   inherit (config) cluster;
@@ -43,7 +46,7 @@ in
           # Cilium writes them again at every start.
 
           operator.replicas = 1;                 # one server
-          prometheus.enabled = true;             # agent metrics (annotated, scraped by Alloy)
+          prometheus.enabled = true;             # agent metrics (annotated, scraped by the OTel Collector)
           operator.prometheus.enabled = true;
           hubble = {
             enabled = true;
@@ -52,10 +55,9 @@ in
             metrics.enabled = [ "dns" "drop" "tcp" "flow" "icmp" "port-distribution" ];
           };
 
-          # SPIKE (v3, ADR 0002): LoadBalancer IPs announced on the LAN by Cilium (instead of
-          # MetalLB) and Gateway API served by Cilium's Envoy (instead of Traefik). Both stay
-          # idle until a CiliumLoadBalancerIPPool / Gateway of class "cilium" exists. The
-          # Gateway API CRDs (v1.5.1) come from k3s's traefik-crd chart for now.
+          # Both stay idle until a CiliumLoadBalancerIPPool / Gateway of class "cilium" exists.
+          # After enabling gatewayAPI on a running cluster, restart cilium-operator: it can
+          # start before cilium-config is updated and never register the Envoy CRDs (ADR 0002).
           l2announcements.enabled = true;
           # L2 announcements hold one lease per Service: the docs ask for a higher client rate.
           k8sClientRateLimit = { qps = 20; burst = 40; };

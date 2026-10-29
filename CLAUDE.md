@@ -10,10 +10,12 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 
 - Phase 1 (host + microVMs) done, gates G0–G6 validated on 2026-10-07.
 - k3s: `kube-1` server (etcd, `clusterInit`), `kube-2`/`kube-3` agents (`modules/k3s/`).
-- Cluster content (MetalLB, Traefik, cert-manager, storage class, OpenBao, Pocket-ID,
-  Headscale, Headlamp, CrowdSec, Tetragon, monitoring collectors, Grafana, Homepage, apps)
-  lives in the `homelab-cluster` repository, applied by Flux. Do not redeclare it here.
-- Entry point: Traefik on `192.168.1.240` (MetalLB), apps on `<app>.abe.lc`, wildcard
+- Cluster content (cert-manager, storage, OpenBao, Pocket-ID, Headscale, Headlamp,
+  CrowdSec, monitoring collectors, Grafana, apps) lives in the `homelab-cluster` repository,
+  applied by Flux. Do not redeclare it here. v3 rewrite in progress (branch `v3` in both
+  repos, spec in homelab-cluster `docs/superpowers/specs/2026-10-29-cluster-v3-design.md`).
+- Entry point: Cilium Gateway on `192.168.1.240` (Cilium LB-IPAM, L2 announcements; no
+  Traefik, no MetalLB since v3), apps on `<app>.abe.lc`, wildcard
   Let's Encrypt certificate. Router port forwarding: TCP 80/443 -> `.240`, UDP 51820 and 41641 -> nuc1.
 - Secrets: sops-nix on the host (`secrets/nuc1.yaml`); in the cluster, OpenBao for apps and
   sops (Flux) for bootstrap only.

@@ -22,5 +22,15 @@ in
       pkgs.runCommand "topology-rejects-duplicate-ip" { } ''
         echo ${lib.escapeShellArg (toString errors)} > $out
       '';
+
+    # Negative test: backups must go to a host that exists.
+    checks.topology-rejects-unknown-backup-host =
+      let
+        errors = clusterLib.validate (lib.recursiveUpdate cluster { backup.host = "nas"; });
+      in
+      assert lib.any (lib.hasPrefix "backup.host refers to an unknown host") errors;
+      pkgs.runCommand "topology-rejects-unknown-backup-host" { } ''
+        echo ${lib.escapeShellArg (toString errors)} > $out
+      '';
   };
 }

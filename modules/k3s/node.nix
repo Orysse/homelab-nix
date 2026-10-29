@@ -65,8 +65,9 @@ in
         nodeName = node;
         nodeIP = spec.address;
         clusterInit = isServer && isBootstrap;
-        # local-storage: volumes would live inside the VMs; they use NFS from the storage host.
-        disable = lib.optionals isServer [ "servicelb" "local-storage" ];
+        # Cilium does LoadBalancer IPs and Gateway API (k3s/cilium.nix), so neither servicelb
+        # nor Traefik. local-storage: homelab-cluster ships its own local-path provisioner.
+        disable = lib.optionals isServer [ "servicelb" "traefik" "local-storage" ];
         serverAddr = lib.optionalString (!isBootstrap)
           "https://${clusterLib.endpointOf bootstrap cluster.nodes.${bootstrap}}:6443";
         # The 127.0.0.53 stub is unreachable from pods (kubelet would fall back to 8.8.8.8).
