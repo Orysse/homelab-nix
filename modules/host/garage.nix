@@ -53,6 +53,9 @@ in
         group = "garage";
         mode = "0750";
       };
+      # The units bind-mount these paths (ReadWritePaths): they must exist before Garage starts.
+      systemd.tmpfiles.settings.garage."/srv/backups/meta".d = { user = "garage"; group = "garage"; mode = "0750"; };
+      systemd.tmpfiles.settings.garage."/srv/backups/data".d = { user = "garage"; group = "garage"; mode = "0750"; };
       # Nested in @root (created by tmpfiles above, not by disko); snapshotted with @data by
       # storage.nix's btrbk instance, which mounts the top level at /mnt/btrfs.
       services.btrbk.instances.data.settings.volume."/mnt/btrfs".subvolume."@root/srv/backups" = { };
@@ -67,6 +70,7 @@ in
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
+          TimeoutStartSec = "2min";   # a switch waits for this unit: never forever
           EnvironmentFile = config.sops.templates."garage.env".path;
         };
         script = ''

@@ -28,6 +28,12 @@ in
       # register this bouncer.
       sops.secrets.crowdsec-bouncer-key = { };
 
+      # Until the cluster (and so the LAPI) is up the bouncer cannot start: keep trying.
+      systemd.services.crowdsec-firewall-bouncer = {
+        unitConfig.StartLimitIntervalSec = 0;
+        serviceConfig = { Restart = "on-failure"; RestartSec = "30s"; };
+      };
+
       services.crowdsec-firewall-bouncer = {
         enable = true;
         createRulesets = false;   # the module would switch the whole host to networking.nftables
