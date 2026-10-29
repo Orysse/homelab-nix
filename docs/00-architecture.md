@@ -17,11 +17,11 @@ LAN 192.168.1.0/24
 
 Three layers to keep separate:
 
-| Layer | Role | Persistence |
-|---|---|---|
-| **host** | physical NixOS, hypervisor (`microvm.nix`), bridge | regular btrfs disk with subvolumes, **no impermanence** (D1) |
-| **VM** | a "node": cold configuration + a small identity share + a k3s data volume | disposable tmpfs root, no VM image |
-| **pod** | k3s workloads | stateful data in PVCs |
+| Layer    | Role                                                                      | Persistence                                                  |
+| -------- | ------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **host** | physical NixOS, hypervisor (`microvm.nix`), bridge                        | regular btrfs disk with subvolumes, **no impermanence** (D1) |
+| **VM**   | a "node": cold configuration + a small identity share + a k3s data volume | disposable tmpfs root, no VM image                           |
+| **pod**  | k3s workloads                                                             | stateful data in PVCs                                        |
 
 ## 2. Core principle
 
@@ -32,9 +32,9 @@ Three layers to keep separate:
 Consequences:
 
 - No VM disk image to back up or migrate. VMs live on their host and can be wiped on restart.
-- ✅ In microvm.nix, a guest's root is **already a tmpfs** by default (`fsType = "tmpfs"`, `size=50%`): there is nothing to configure for impermanence *inside* the VM.
+- ✅ In microvm.nix, a guest's root is **already a tmpfs** by default (`fsType = "tmpfs"`, `size=50%`): there is nothing to configure for impermanence _inside_ the VM.
 - ✅ The host's `/nix/store` is shared read-only with the guest (virtiofs share), which avoids a large squashfs image.
-- A **writable store overlay** is not needed: VMs do not run `nix build`, they are rebuilt by the host. ✅ It would require a *volume* anyway (9p/virtiofs shares do not work with overlayfs). **We do not use one.**
+- A **writable store overlay** is not needed: VMs do not run `nix build`, they are rebuilt by the host. ✅ It would require a _volume_ anyway (9p/virtiofs shares do not work with overlayfs). **We do not use one.**
 - The state tolerated for a VM is a small **identity** (SSH host keys, D4) and the **k3s data volume** (D9).
 
 ## 3. Data model: the topology is data

@@ -4,9 +4,9 @@
 { config, ... }:
 let
   inherit (config) cluster;
-  # Other zones served by the same ingress (homelab-cluster: apps/holive).
+  # Other zones served by the same ingress (homelab-cluster: apps/holive, apps/oxymore).
   otherZones = {
-    "holive.fr" = [ "holive.fr" "www.holive.fr" ];
+    "holive.fr" = [ "holive.fr" "*.holive.fr" ];
   };
 in
 {
