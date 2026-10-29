@@ -51,6 +51,15 @@ in
             ui.enabled = true;
             metrics.enabled = [ "dns" "drop" "tcp" "flow" "icmp" "port-distribution" ];
           };
+
+          # SPIKE (v3, ADR 0002): LoadBalancer IPs announced on the LAN by Cilium (instead of
+          # MetalLB) and Gateway API served by Cilium's Envoy (instead of Traefik). Both stay
+          # idle until a CiliumLoadBalancerIPPool / Gateway of class "cilium" exists. The
+          # Gateway API CRDs (v1.5.1) come from k3s's traefik-crd chart for now.
+          l2announcements.enabled = true;
+          # L2 announcements hold one lease per Service: the docs ask for a higher client rate.
+          k8sClientRateLimit = { qps = 20; burst = 40; };
+          gatewayAPI.enabled = true;
         };
       };
     };
