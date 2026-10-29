@@ -21,7 +21,9 @@ in
     lib.mkIf (cluster.monitoring.host == config.networking.hostName) {
       services.vmalert.instances.homelab = {
         enable = true;
-        rules = import ./_alert-rules.nix { inherit domain; };
+        # Alert rules, plus the power estimate's recording rules (_power-rules.nix, tested by power.nix).
+        rules = let alerts = import ./_alert-rules.nix { inherit domain; }; in
+          alerts // { groups = alerts.groups ++ [ (import ./_power-rules.nix) ]; };
         settings = {
           "datasource.url" = "http://127.0.0.1:8428";
           "notifier.url" = [ "http://127.0.0.1:9093" ];
