@@ -149,8 +149,8 @@ in
 
       # Default pod security: a new namespace is baseline at least (no privileged pods, no host
       # namespaces or paths) unless labelled otherwise; restricted shows up as warnings and in
-      # the audit log. Exempt: the namespaces whose pods need the host (Cilium, Tetragon, CSI,
-      # MetalLB speakers, CrowdSec agents). monitoring is labelled privileged in
+      # the audit log. Exempt: the namespaces whose pods need the host (Cilium, CSI,
+      # CrowdSec agents). monitoring is labelled privileged in
       # homelab-cluster.
       environment.etc."kubernetes/pod-security.yaml" = lib.mkIf isServer {
         text = builtins.toJSON {
@@ -168,7 +168,7 @@ in
               };
               exemptions = {
                 usernames = [ ]; runtimeClasses = [ ];
-                namespaces = [ "kube-system" "crowdsec" "metallb-system" ];
+                namespaces = [ "kube-system" "crowdsec" ];
               };
             };
           }];
@@ -208,8 +208,8 @@ in
       };
 
       # https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
-      # Open to the LAN: SSH, the API (kubectl from the LAN and the VPN), Traefik.
-      # Nodes only: etcd, kubelet, MetalLB memberlist (7946), Cilium health (4240), Hubble
+      # Open to the LAN: SSH, the API (kubectl from the LAN and the VPN), the Gateway (80/443).
+      # Nodes only: etcd, kubelet, Cilium health (4240), Hubble
       # peers (4244), Cilium WireGuard (51871).
       networking.firewall =
         let
@@ -223,7 +223,7 @@ in
         in
         {
           allowedTCPPorts = [ 80 443 ] ++ lib.optionals isServer [ 6443 ];
-          extraCommands = fromNodes "tcp" "10250" + fromNodes "tcp" "7946" + fromNodes "udp" "7946"
+          extraCommands = fromNodes "tcp" "10250"
             + fromNodes "tcp" "4240" + fromNodes "tcp" "4244" + fromNodes "udp" "51871"
             + fromPods "10250" + fromPods "4244"
             + lib.optionalString isServer (fromNodes "tcp" "2379:2380");

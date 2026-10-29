@@ -2,7 +2,7 @@
 # The Flux Operator installs and upgrades Flux from one FluxInstance, which also points it
 # at the homelab-cluster repository (GitRepository and Kustomization "flux-system").
 # cluster-vars exposes the topology to the manifests (${DOMAIN}, ${INGRESS_ADDRESS}…).
-{ config, ... }:
+{ config, lib, ... }:
 let
   inherit (config) cluster;
 in
@@ -51,7 +51,9 @@ in
         DOMAIN = cluster.ingress.domain;
         INGRESS_ADDRESS = cluster.ingress.address;
         INTERNAL_ADDRESS = cluster.ingress.internalAddress;
-        INGRESS_POOL = cluster.ingress.pool;
+        # Cilium LB-IPAM takes the range as start and stop.
+        INGRESS_POOL_START = builtins.head (lib.splitString "-" cluster.ingress.pool);
+        INGRESS_POOL_STOP = lib.last (lib.splitString "-" cluster.ingress.pool);
         NFS_SERVER = cluster.hosts.${cluster.storage.host}.address;
         NFS_SHARE = cluster.storage.path;
         BACKUP_ADDRESS = cluster.hosts.${cluster.backup.host}.address;

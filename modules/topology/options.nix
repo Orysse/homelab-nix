@@ -33,7 +33,7 @@ in
       };
       pool = mkOption {
         type = types.str;
-        description = "IP range MetalLB may assign (must contain `address`), e.g. 192.168.1.240-192.168.1.254.";
+        description = "IP range Cilium may assign to LoadBalancer Services (must contain `address`), e.g. 192.168.1.240-192.168.1.254.";
       };
       domain = mkOption {
         type = types.str;

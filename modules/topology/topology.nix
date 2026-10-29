@@ -5,7 +5,7 @@
     # Router DHCP: .10–.150. Outside DHCP:
     #   .200–.209  physical hosts
     #   .210–.239  k3s nodes (kube-N = .21N)
-    #   .240–.254  LoadBalancers (MetalLB)
+    #   .240–.254  LoadBalancers (Cilium LB-IPAM)
     network = {
       subnet = "192.168.1.0";
       prefixLength = 24;

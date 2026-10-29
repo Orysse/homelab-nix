@@ -21,7 +21,7 @@ in
       username = "token"; # value required by ddclient for an API token
       passwordFile = config.sops.secrets.cloudflare-ddns-token.path;
       usev4 = "webv4, webv4=ipify-ipv4";
-      usev6 = ""; # the MetalLB entry point is IPv4 only
+      usev6 = ""; # the Gateway entry point is IPv4 only
       interval = "5min";
       # Written before the main domains line; zone= on a host line applies to it only.
       extraConfig = lib.concatStringsSep "\n" (lib.mapAttrsToList
