@@ -17,6 +17,7 @@
     ingress = {
       address = "192.168.1.240";
       internalAddress = "192.168.1.241"; # VPN/LAN only: not port-forwarded
+      lapiAddress = "192.168.1.242";     # CrowdSec LAPI, for the hosts' firewall bouncer
       pool = "192.168.1.240-192.168.1.254";
       domain = "abe.lc";
     };

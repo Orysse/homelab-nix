@@ -51,6 +51,7 @@ in
         DOMAIN = cluster.ingress.domain;
         INGRESS_ADDRESS = cluster.ingress.address;
         INTERNAL_ADDRESS = cluster.ingress.internalAddress;
+        LAPI_ADDRESS = cluster.ingress.lapiAddress;
         # Cilium LB-IPAM takes the range as start and stop.
         INGRESS_POOL_START = builtins.head (lib.splitString "-" cluster.ingress.pool);
         INGRESS_POOL_STOP = lib.last (lib.splitString "-" cluster.ingress.pool);

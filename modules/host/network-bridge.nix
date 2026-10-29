@@ -37,8 +37,8 @@ in
 
       services.resolved.settings.Resolve.MulticastDNS = "yes";
 
-      # Only filters traffic addressed to the host: bridged traffic to the VMs does not
-      # go through netfilter (no br_netfilter).
+      # Filters traffic addressed to the host. Bridged traffic to the VMs reaches netfilter
+      # only for CrowdSec's bans (br_netfilter, crowdsec-bouncer.nix).
       networking.firewall.enable = true;
       networking.firewall.allowedUDPPorts = [ 5353 ];
     };

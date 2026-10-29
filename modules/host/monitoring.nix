@@ -38,6 +38,7 @@ in
         }) {
           node = 9100;            # incl. systemd units
           wireguard = 9586;
+          crowdsec-firewall-bouncer = 60601;   # crowdsec-bouncer.nix, same host for now
           smartctl = 9633;
           victoriametrics = 8428;
           victorialogs = 9428;

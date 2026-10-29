@@ -25,11 +25,15 @@ in
     ingress = {
       address = mkOption {
         type = types.str;
-        description = "Traefik's LoadBalancer IP (target of the router's port forwarding).";
+        description = "The public Gateway's LoadBalancer IP (target of the router's port forwarding).";
+      };
+      lapiAddress = mkOption {
+        type = types.str;
+        description = "LoadBalancer IP of CrowdSec's LAPI, for the firewall bouncer on the physical hosts. In the pool, not port-forwarded.";
       };
       internalAddress = mkOption {
         type = types.str;
-        description = "Traefik's second LoadBalancer IP, for internal apps (*.int.<domain>). Must NOT be port-forwarded.";
+        description = "Second LoadBalancer IP (Gateway internal), for internal apps (*.int.<domain>). Must NOT be port-forwarded.";
       };
       pool = mkOption {
         type = types.str;
