@@ -23,19 +23,24 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
   subnet router and an exit node for admins (`host/tailscale.nix`). WireGuard on nuc1 (`10.250.0.0/24`) stays as
   break-glass for the owner's laptop. Dynamic DNS (ddclient) runs on nuc1.
   No impermanence on the host (D1 revised).
-- Storage: all persistent data on nuc1 (`/srv/data`, NFS to the nodes, btrbk snapshots), see D21.
-  No state inside the VMs.
+- Storage: NFS from nuc1 (`/srv/data`, btrbk snapshots, D21) for small app files; since v3 a
+  local volume per VM (`/var/lib/local-volumes`, topology `localDisk`) for PostgreSQL. Backups:
+  Garage (S3) on nuc1 (`host/garage.nix`, `/srv/backups`), until the NAS.
+  No state inside the VMs other than that local volume.
 - Monitoring (D23): VictoriaMetrics, VictoriaLogs, vmalert, Alertmanager on nuc1 (alerts emailed
   from homelab@abe.lc to the owner's address, sops `alert-email`; heartbeat to Healthchecks.io); Grafana at `grafana.int.abe.lc`, in
   the cluster. Host rule: D22.
-- Databases (D24): PostgreSQL on nuc1 (`@db`), one per app namespace, passwords owned by
-  OpenBao (in the cluster); read-only cross-app grants in topology `database.readers`. Secrets: sops for the platform, OpenBao for apps.
+- Databases (D24, D28): v3 moves them into the cluster (CloudNativePG, homelab-cluster ADR 0006);
+  `host/postgres.nix` on nuc1 stays until the cutover import and a restore test are done. v2: one
+  database per app namespace, passwords owned by OpenBao.
 - Identity (D25): Pocket-ID at `auth.abe.lc`; the k3s API server accepts its tokens
-  (topology `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.abe.lc`.
+  (topology `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.abe.lc`. Since v3
+  Pocket-ID runs from its operator, OIDC clients are objects next to each app (ADR 0004).
   Groups: `admins` (cluster-admin), `visitors` (read-only); API audit log (people only) in
   VictoriaLogs.
 - Network (D27): Cilium (native routing, kube-proxy replacement, WireGuard, Hubble at
-  `hubble.int.abe.lc`), installed by the base (`k3s/cilium.nix`).
+  `hubble.int.abe.lc`), installed by the base (`k3s/cilium.nix`); since v3 also LB-IPAM, L2
+  announcements and Gateway API (ADR 0002). Flux itself: Flux Operator + FluxInstance (`k3s/flux.nix`).
 - Updates (D26): Renovate PRs (weekly `flake.lock`), CI runs `nix flake check`, deploy by hand.
   k3s pinned to `k3s_1_36`, PostgreSQL to 18.
 - nuc1: new PSU since 2026-10-11, BIOS power limits (the 65 W one needed a 25 W software cap). NIC offloads off
