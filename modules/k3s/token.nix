@@ -54,7 +54,7 @@ in
         description = "Allocate the local volume of ${vm.name}";
         wantedBy = [ "microvms.target" ];
         after = [ "microvm@${vm.name}.service" ];
-        path = [ pkgs.coreutils ];
+        path = [ pkgs.coreutils pkgs.util-linux ];
         serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
         script = ''
           img=/var/lib/microvms/${vm.name}/local.img
