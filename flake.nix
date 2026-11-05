@@ -14,6 +14,9 @@
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     deploy-rs.url = "github:serokell/deploy-rs";
     deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
+    # Topology layer (hosts, services, microVM guests as entities). Pre-1.0, pinned by tag:
+    # Renovate does not bump a tag in a URL, upgrade by hand after reading the changelog.
+    den.url = "github:denful/den/v0.19.0";
   };
 
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
