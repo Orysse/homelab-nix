@@ -7,3 +7,8 @@ creation_rules:
   - path_regex: secrets/nuc1\.yaml$
     key_groups:
       - age: [*abel_age, *abel_yubikey, *nuc1]
+  # Shared by every host (the k3s token). Adding a host: add its key above and to the list
+  # below, then `sops updatekeys secrets/cluster.yaml`.
+  - path_regex: secrets/cluster\.yaml$
+    key_groups:
+      - age: [*abel_age, *abel_yubikey, *nuc1]

@@ -1,8 +1,15 @@
-# Token generated on the host, outside the repository. When a node moves to another host,
-# copy /var/lib/homelab/k3s-token there. Target: sops-nix (D10).
+# One k3s token for the whole cluster, copied into each k3s VM's persist before it starts.
+# k3s encrypts its bootstrap data with the server's token: the value must never change
+# (`k3s token rotate` otherwise), and every host needs the same one.
+# With secrets/cluster.yaml (key `k3s-token`, encrypted to every host, D10) it comes from
+# sops. Until that file exists, the host generates it in /var/lib/homelab/k3s-token as
+# before.
+# shortcut: the generated fallback, drop it once secrets/cluster.yaml is committed.
 { config, ... }:
 let
   inherit (config) cluster;
+  clusterSecret = ../../secrets/cluster.yaml;
+  fromSops = builtins.pathExists clusterSecret;
 in
 {
   flake.modules.nixos.k3s-token = { config, lib, pkgs, ... }:
@@ -10,11 +17,13 @@ in
       clusterLib = import ../topology/_lib.nix { inherit lib; };
       vm = clusterLib.k3sVmOf cluster config.networking.hostName;
       nodes = lib.optional (vm != null) vm.name;
-      tokenPath = "/var/lib/homelab/k3s-token";
+      tokenPath = if fromSops then config.sops.secrets.k3s-token.path else "/var/lib/homelab/k3s-token";
     in
     {
+      sops.secrets = lib.optionalAttrs fromSops { k3s-token.sopsFile = clusterSecret; };
+
       systemd.services.homelab-k3s-token = {
-        description = "Generate the k3s token and distribute it to the microVMs";
+        description = "Install the k3s token into the microVMs";
         wantedBy = [ "microvms.target" ];
         before = map (n: "microvm@${n}.service") nodes;
         requiredBy = map (n: "microvm@${n}.service") nodes;
@@ -24,12 +33,14 @@ in
           RemainAfterExit = true;
           UMask = "0077";
         };
-        path = [ pkgs.coreutils pkgs.openssl ];
+        path = [ pkgs.coreutils ] ++ lib.optional (!fromSops) pkgs.openssl;
         script = ''
-          if [ ! -s ${tokenPath} ]; then
-            mkdir -p "$(dirname ${tokenPath})"
-            openssl rand -hex 32 > ${tokenPath}
-          fi
+          ${lib.optionalString (!fromSops) ''
+            if [ ! -s ${tokenPath} ]; then
+              mkdir -p "$(dirname ${tokenPath})"
+              openssl rand -hex 32 > ${tokenPath}
+            fi
+          ''}
           for n in ${lib.escapeShellArgs nodes}; do
             install -D -m 0600 ${tokenPath} /var/lib/microvms/$n/persist/k3s-token
           done

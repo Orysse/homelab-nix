@@ -26,9 +26,9 @@ in
     {
       homelab-host.nixos.imports = with m; [
         base boot users-ssh disk-layout network-bridge cluster-assertions k3s-token secrets
-        crowdsec-bouncer
+        crowdsec-bouncer telemetry
       ];
-      vpn.nixos.imports = with m; [ wireguard tailscale ddns ];
+      vpn.nixos.imports = with m; [ wireguard wireguard-exporter tailscale ddns ];
       monitoring.nixos.imports = with m; [ monitoring alerting ];
       backup.nixos.imports = [ m.garage ];
       scanner.nixos.imports = [ m.trivy ];

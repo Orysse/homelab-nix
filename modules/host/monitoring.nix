@@ -1,51 +1,50 @@
 # Monitoring backends on the monitoring host, below the cluster: they keep working, and
 # keep the history, when the cluster is broken (D22).
-#   VictoriaMetrics :8428  metrics (Prometheus API), pushed by Alloy in the cluster,
-#                          scrapes this host's exporters itself
-#   VictoriaLogs    :9428  logs, pushed by Alloy and by systemd-journal-upload (journald)
+#   VictoriaMetrics :8428  metrics (Prometheus API), pushed by the collector in the cluster,
+#                          scrapes every host's exporters itself (telemetry.nix)
+#   VictoriaLogs    :9428  logs, pushed by the collector and by every host's journal upload
 # Alerting: alerting.nix (vmalert + Alertmanager). Dashboards: Grafana, in the cluster.
-# Both ports only accept the nodes; the exporters listen on localhost.
+# 8428 only accepts the k3s VMs; 9428 also accepts the hosts.
 { config, ... }:
 let
   inherit (config) cluster;
 in
 {
-  flake.modules.nixos.monitoring = { config, lib, pkgs, ... }:
+  flake.modules.nixos.monitoring = { config, lib, ... }:
     let
-      domain = (clusterLib.theCluster cluster).ingress.domain;
-      host = config.networking.hostName;
       clusterLib = import ../topology/_lib.nix { inherit lib; };
-      nodeIPs = clusterLib.vmIPs cluster;
-      fromNodes = port: lib.concatMapStrings
+      host = config.networking.hostName;
+      address = clusterLib.hostAddress cluster;
+      hostNames = lib.attrNames cluster.hosts;
+      fromIPs = ips: port: lib.concatMapStrings
         (ip: "iptables -A nixos-fw -p tcp -s ${ip} --dport ${toString port} -j nixos-fw-accept\n")
-        nodeIPs;
-      # WireGuard exporter: peers named after the topology, not their public key.
-      wgNames = pkgs.writeText "wg0-names.conf" (lib.concatStrings (lib.mapAttrsToList (name: peer: ''
-        [Peer]
-        # friendly_name = ${name}
-        PublicKey = ${peer.publicKey}
-        AllowedIPs = ${peer.address}/32
-      '') cluster.vpn.peers));
+        ips;
+      vmIPs = clusterLib.vmIPs cluster;
+      hostIPs = map address hostNames;
+
+      # One job per exporter, one target per host that runs it; "host" tells hosts apart.
+      onHosts = port: hosts: map (h: { targets = [ "${address h}:${toString port}" ]; labels.host = h; }) hosts;
+      k3sHosts = lib.filter (h: clusterLib.k3sVmOf cluster h != null) hostNames;
+      local = port: [{ targets = [ "127.0.0.1:${toString port}" ]; labels.host = host; }];
+      jobs = {
+        node = onHosts 9100 hostNames;                                       # incl. systemd units
+        smartctl = onHosts 9633 hostNames;
+        wireguard = onHosts 9586 [ (clusterLib.hostOf cluster "vpn") ];      # wireguard.nix
+        crowdsec-firewall-bouncer = onHosts 60601 k3sHosts;                  # crowdsec-bouncer.nix
+        victoriametrics = local 8428;
+        victorialogs = local 9428;
+        vmalert = local 8880;
+        alertmanager = local 9093;
+      };
     in
     {
       services.victoriametrics = {
         enable = true;
         listenAddress = ":8428";
         retentionPeriod = "90d";
-        # One job per exporter on this host; "host" tells hosts apart once there are several.
-        prometheusConfig.scrape_configs = lib.mapAttrsToList (job: port: {
-          job_name = job;
-          static_configs = [{ targets = [ "127.0.0.1:${toString port}" ]; labels.host = host; }];
-        }) {
-          node = 9100;            # incl. systemd units
-          wireguard = 9586;
-          crowdsec-firewall-bouncer = 60601;   # crowdsec-bouncer.nix, same host for now
-          smartctl = 9633;
-          victoriametrics = 8428;
-          victorialogs = 9428;
-          vmalert = 8880;
-          alertmanager = 9093;
-        };
+        prometheusConfig.scrape_configs = lib.mapAttrsToList
+          (job_name: static_configs: { inherit job_name static_configs; })
+          jobs;
       };
 
       services.victorialogs = {
@@ -54,44 +53,12 @@ in
         extraOptions = [ "-retentionPeriod=30d" ];
       };
 
-      # This host's journal, straight into VictoriaLogs (no agent).
-      services.journald.upload = {
-        enable = true;
-        settings.Upload.URL = "http://127.0.0.1:9428/insert/journald";
-      };
+      # This host's journal upload (telemetry.nix) starts after the backend it pushes to.
       systemd.services.systemd-journal-upload = {
         after = [ "victorialogs.service" ];
         wants = [ "victorialogs.service" ];
       };
 
-      # Power use (node_rapl_*, for cost estimates): the kernel makes the RAPL energy counters
-      # root-only (a side channel); the node exporter's group may read them. On the NUC10,
-      # "psys" (the whole platform) is the trustworthy zone; "package" reads high.
-      services.udev.extraRules = ''
-        ACTION=="add", SUBSYSTEM=="powercap", KERNEL=="intel-rapl:*", RUN+="${pkgs.coreutils}/bin/chgrp node-exporter /sys%p/energy_uj", RUN+="${pkgs.coreutils}/bin/chmod g+r /sys%p/energy_uj"
-      '';
-
-      services.prometheus.exporters = {
-        node = {
-          enable = true;
-          listenAddress = "127.0.0.1";
-          enabledCollectors = [ "systemd" ];
-          extraFlags = [
-            # Units worth watching: the VMs and what the host serves.
-            "--collector.systemd.unit-include=(microvm.*|sshd|systemd-networkd|ddclient|nfs-server|btrbk-.*|victoria.*|vmalert-.*|alertmanager|trivy-scan|systemd-journal-upload)\\.(service|timer)"
-          ];
-        };
-        wireguard = {
-          enable = true;
-          listenAddress = "127.0.0.1";
-          wireguardConfig = "${wgNames}";
-        };
-        smartctl = {
-          enable = true;
-          listenAddress = "127.0.0.1";
-        };
-      };
-
-      networking.firewall.extraCommands = fromNodes 8428 + fromNodes 9428;
+      networking.firewall.extraCommands = fromIPs vmIPs 8428 + fromIPs (vmIPs ++ hostIPs) 9428;
     };
 }
