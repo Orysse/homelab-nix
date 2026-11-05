@@ -10,6 +10,10 @@
       description = "System disk (preferably /dev/disk/by-id/…).";
     };
 
+    # nocow: SeaweedFS checksums its own needles, and its append-and-compact files fragment
+    # under copy-on-write. Applies to files created afterwards.
+    config.systemd.tmpfiles.settings."20-seaweed"."/srv/seaweed".h.argument = "+C";
+
     config.disko.devices.disk.main = {
       type = "disk";
       device = config.homelab.diskDevice;
@@ -41,6 +45,8 @@
                   "/@microvms" = { mountpoint = "/var/lib/microvms"; mountOptions = opts; };
                   "/@data" = { mountpoint = "/srv/data"; mountOptions = opts; };   # cluster volumes (storage.nix)
                   "/@db" = { mountpoint = "/var/lib/postgresql"; mountOptions = opts; };   # postgres.nix
+                  # SeaweedFS volume data (phase 4): shared with the k3s VM, not snapshotted.
+                  "/@seaweed" = { mountpoint = "/srv/seaweed"; mountOptions = opts; };
                   "/@snapshots" = { };   # btrbk snapshots of @data (storage.nix), not mounted
                 };
             };

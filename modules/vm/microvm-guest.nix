@@ -38,6 +38,13 @@ in
             tag = "persist";
             proto = "virtiofs";
           }
+          # SeaweedFS volume server data: outlives the VM and the cluster (disk-layout.nix).
+          {
+            source = "/srv/seaweed";
+            mountPoint = "/var/lib/seaweed";
+            tag = "seaweed";
+            proto = "virtiofs";
+          }
         ];
       };
 

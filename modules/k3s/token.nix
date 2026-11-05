@@ -47,6 +47,22 @@ in
         '';
       };
 
+      # local.img is sparse: a full host disk would make writes fail under the databases
+      # that live on it. Allocate it once the VM has created it (nocow, so the blocks stay
+      # ours). The data disk (re-pullable images) stays sparse.
+      systemd.services.homelab-vm-prealloc = lib.mkIf (vm != null) {
+        description = "Allocate the local volume of ${vm.name}";
+        wantedBy = [ "microvms.target" ];
+        after = [ "microvm@${vm.name}.service" ];
+        path = [ pkgs.coreutils ];
+        serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
+        script = ''
+          img=/var/lib/microvms/${vm.name}/local.img
+          for _ in $(seq 120); do [ -e "$img" ] && break; sleep 1; done
+          fallocate -l ${toString vm.localDisk}M "$img"
+        '';
+      };
+
       # Volume images without btrfs copy-on-write (fragmentation); +C only applies to
       # files created afterwards.
       systemd.tmpfiles.settings."20-microvm-nocow" = lib.genAttrs
