@@ -13,7 +13,7 @@ in
     checks.topology-rejects-duplicate-ip =
       let
         good = cluster;
-        bad = lib.recursiveUpdate good { nodes.kube-2.address = "192.168.1.211"; };
+        bad = lib.recursiveUpdate good { hosts.nuc1.address = "192.168.1.210"; };
         errors = clusterLib.validate bad;
       in
       assert clusterLib.validate good == [ ];
@@ -26,7 +26,7 @@ in
     # Negative test: a node's local volume must hold at least one database.
     checks.topology-rejects-small-local-disk =
       let
-        errors = clusterLib.validate (lib.recursiveUpdate cluster { nodes.kube-2.localDisk = 1024; });
+        errors = clusterLib.validate (lib.recursiveUpdate cluster { nodes.kube-0.localDisk = 1024; });
       in
       assert lib.any (lib.hasPrefix "localDisk below 4096 MiB") errors;
       pkgs.runCommand "topology-rejects-small-local-disk" { } ''

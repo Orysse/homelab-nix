@@ -70,7 +70,7 @@
         #   address = "10.250.0.10";
         #   publicKey = "<his WireGuard public key>";
         #   access = [
-        #     { address = "192.168.1.211"; port = 6443; }
+        #     { address = "192.168.1.210"; port = 6443; }
         #     { address = "192.168.1.241"; port = 443; }
         #   ];
         # };
@@ -85,9 +85,7 @@
 
     # mem in MB. Never exactly 2048: QEMU hangs (microvm.nix#171).
     nodes = {
-      kube-1 = { host = "nuc1"; address = "192.168.1.211"; role = "server"; mem = 4000; vcpu = 2; balloon = true; };   # control plane + etcd; 1 GB kept for k3s (k3s/node.nix)
-      kube-2 = { host = "nuc1"; address = "192.168.1.212"; role = "agent"; mem = 3500; vcpu = 2; balloon = true; };
-      kube-3 = { host = "nuc1"; address = "192.168.1.213"; role = "agent"; mem = 3000; vcpu = 2; balloon = true; };
+      kube-0 = { host = "nuc1"; address = "192.168.1.210"; role = "server"; mem = 9216; vcpu = 12; balloon = true; };   # control plane + etcd; 1 GB kept for k3s (k3s/node.nix). 9216 MB approved by the owner 2026-11-05 (hc docs/measurements.md). Phase 2 replaces `nodes`.
     };
   };
 }

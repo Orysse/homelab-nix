@@ -15,17 +15,17 @@
             { series = ''node_rapl_package_joules_total{job="node",host="nuc1"}''; values = "0+600x20"; }
             { series = ''node_cpu_seconds_total{job="node",host="nuc1",cpu="0",mode="user"}''; values = "0+60x20"; }
             { series = ''node_cpu_seconds_total{job="node",host="nuc1",cpu="0",mode="idle"}''; values = "0+0x20"; }
-            # kube-1 uses half a core of it; the namespace gatus a quarter of that.
-            { series = ''node_cpu_seconds_total{job="prometheus-node-exporter",node="kube-1",cpu="0",mode="user"}''; values = "0+30x20"; }
-            { series = ''container_cpu_usage_seconds_total{job="cadvisor",instance="kube-1",namespace="gatus",container="gatus"}''; values = "0+7.5x20"; }
+            # kube-0 uses half a core of it; the namespace gatus a quarter of that.
+            { series = ''node_cpu_seconds_total{job="prometheus-node-exporter",node="kube-0",cpu="0",mode="user"}''; values = "0+30x20"; }
+            { series = ''container_cpu_usage_seconds_total{job="cadvisor",instance="kube-0",namespace="gatus",container="gatus"}''; values = "0+7.5x20"; }
           ];
           metricsql_expr_test = [
             { expr = "homelab:host_power_watts"; eval_time = "10m";
               exp_samples = [{ labels = ''homelab:host_power_watts{host="nuc1"}''; value = 15; }]; }
             { expr = "homelab:vm_power_watts"; eval_time = "10m";
-              exp_samples = [{ labels = ''homelab:vm_power_watts{node="kube-1"}''; value = 5; }]; }
+              exp_samples = [{ labels = ''homelab:vm_power_watts{node="kube-0"}''; value = 5; }]; }
             { expr = "homelab:namespace_power_watts"; eval_time = "10m";
-              exp_samples = [{ labels = ''homelab:namespace_power_watts{node="kube-1",namespace="gatus"}''; value = 1.25; }]; }
+              exp_samples = [{ labels = ''homelab:namespace_power_watts{node="kube-0",namespace="gatus"}''; value = 1.25; }]; }
             { expr = "homelab:power_cost_eur_month"; eval_time = "10m";
               exp_samples = [{ labels = ''homelab:power_cost_eur_month{host="nuc1"}''; value = 2.7375; }]; }
           ];

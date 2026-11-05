@@ -16,9 +16,7 @@ base hands it the network parameters through the `cluster-vars` ConfigMap (see
  LAN 192.168.1.0/24
    │
    ├── nuc1  192.168.1.200          NixOS · br0 · microvm.nix          modules/host, modules/vm
-   │     ├── kube-1  .211  server   ┐
-   │     ├── kube-2  .212  agent    ├─ k3s                             modules/k3s
-   │     └── kube-3  .213  agent    ┘
+   │     └── kube-0  .210  server   ── k3s                             modules/k3s
    │
    └── 192.168.1.240                HTTP(S) entry point: MetalLB -> Traefik
 ```
@@ -60,7 +58,7 @@ ignored by import-tree.
 nix flake check                                                         # evaluation + topology tests
 nix build .#nixosConfigurations.nuc1.config.system.build.toplevel       # full build (host + VMs)
 nix run .#deploy-rs -- .#nuc1                                           # deploy (auto rollback)
-ssh root@192.168.1.211 k3s kubectl get nodes                            # cluster status
+ssh root@192.168.1.210 k3s kubectl get nodes                            # cluster status
 ```
 
 Changing an IP, a node's RAM, or moving a node to another host is a one-line change in
