@@ -21,10 +21,15 @@ in
           "{{ $labels.host }} restarted"
           "{{ $labels.host }} booted less than 15 minutes ago. Unplanned? Check the power supply, then `journalctl -b -1 | tail`.")
         (alert "HostUnitInactive"
-          "node_systemd_unit_state{job=\"node\",state=\"active\",name=~\"microvm@.+|microvm-virtiofsd@.+|sshd.service|systemd-networkd.service|nfs-server.service|victoria.+|vmalert.+|alertmanager.service|ddclient.timer|btrbk-data.timer|trivy-scan.timer\"} == 0"
+          "node_systemd_unit_state{job=\"node\",state=\"active\",name=~\"microvm@.+|microvm-virtiofsd@.+|sshd.service|systemd-networkd.service|nfs-server.service|victoria.+|vmalert.+|alertmanager.service|ddclient.timer|btrbk-data.timer|trivy-scan.timer|garage-offsite.timer\"} == 0"
           "5m" "critical"
           "{{ $labels.host }}: {{ $labels.name }} is not active"
           "`systemctl status {{ $labels.name }}` and `journalctl -u {{ $labels.name }} -n 50` on {{ $labels.host }}.")
+        (alert "OffsiteCopyFailed"
+          "node_systemd_unit_state{job=\"node\",state=\"failed\",name=\"garage-offsite.service\"} == 1"
+          "0m" "warning"
+          "{{ $labels.host }}: the offsite copy of the backups failed"
+          "`journalctl -u garage-offsite -n 50` on {{ $labels.host }}: expired R2 token, quota, or the network.")
         (alert "HostDiskFilling"
           "1 - node_filesystem_avail_bytes{job=\"node\",fstype=\"btrfs\"} / node_filesystem_size_bytes{job=\"node\",fstype=\"btrfs\"} > 0.85"
           "30m" "warning"

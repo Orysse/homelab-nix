@@ -16,7 +16,6 @@ in
       garage = "${config.services.garage.package}/bin/garage";
     in
     {
-      sops.secrets.garage-rpc-secret = { };
       sops.templates."garage.env".content =
         "GARAGE_RPC_SECRET=${config.sops.placeholder.garage-rpc-secret}";
 
@@ -83,8 +82,72 @@ in
           ${garage} bucket info cnpg >/dev/null 2>&1 || ${garage} bucket create cnpg
           ${garage} key info cnpg >/dev/null 2>&1 || ${garage} key create cnpg
           ${garage} bucket allow --read --write cnpg --key cnpg
+          # Read-only key for the offsite copy (below).
+          ${garage} key info offsite >/dev/null 2>&1 || ${garage} key create offsite
+          ${garage} bucket allow --read cnpg --key offsite
         '';
       };
+
+      # Offsite copy: the buckets, encrypted client-side (rclone crypt), to a Cloudflare R2
+      # bucket (free tier: 10 GB), daily. Until the NAS takes over (design item 24).
+      # A copy, not a replica: `sync` mirrors deletions, so barman's retention carries over;
+      # R2 has no versioning. Restore: rclone copy offsite:cnpg back into Garage (or any S3).
+      # Secrets (secrets/nuc1.yaml), all written by the owner: offsite-r2-endpoint
+      # (https://<account id>.r2.cloudflarestorage.com), offsite-r2-bucket,
+      # offsite-r2-key-id and offsite-r2-key-secret (an R2 API token scoped to that bucket,
+      # Object Read & Write), offsite-crypt-password and offsite-crypt-salt (two long random
+      # strings; losing them makes the copy unreadable, keep them in the password manager).
+      sops.secrets = lib.genAttrs [
+        "offsite-r2-endpoint" "offsite-r2-bucket" "offsite-r2-key-id" "offsite-r2-key-secret"
+        "offsite-crypt-password" "offsite-crypt-salt" "garage-rpc-secret"
+      ] (_: { });
+      sops.templates."garage-offsite.env".content =
+        let p = config.sops.placeholder; in ''
+          RCLONE_CONFIG_R2_ENDPOINT=${p.offsite-r2-endpoint}
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID=${p.offsite-r2-key-id}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY=${p.offsite-r2-key-secret}
+          R2_BUCKET=${p.offsite-r2-bucket}
+          CRYPT_PASSWORD=${p.offsite-crypt-password}
+          CRYPT_SALT=${p.offsite-crypt-salt}
+        '';
+      systemd.services.garage-offsite = {
+        description = "Encrypted copy of the Garage buckets to Cloudflare R2";
+        after = [ "garage-setup.service" ];
+        requires = [ "garage-setup.service" ];
+        path = [ pkgs.rclone pkgs.gawk ];
+        environment = {
+          RCLONE_CONFIG_GARAGE_TYPE = "s3";
+          RCLONE_CONFIG_GARAGE_PROVIDER = "Other";
+          RCLONE_CONFIG_GARAGE_ENDPOINT = "http://127.0.0.1:3900";
+          RCLONE_CONFIG_GARAGE_REGION = "garage";
+          RCLONE_CONFIG_R2_TYPE = "s3";
+          RCLONE_CONFIG_R2_PROVIDER = "Cloudflare";
+          # The token is scoped to one bucket: rclone must not try to create it.
+          RCLONE_CONFIG_R2_NO_CHECK_BUCKET = "true";
+          RCLONE_CONFIG_OFFSITE_TYPE = "crypt";
+        };
+        serviceConfig = {
+          Type = "oneshot";
+          EnvironmentFile = [
+            config.sops.templates."garage.env".path
+            config.sops.templates."garage-offsite.env".path
+          ];
+        };
+        script = ''
+          info=$(${garage} key info offsite --show-secret)
+          export RCLONE_CONFIG_GARAGE_ACCESS_KEY_ID=$(echo "$info" | awk '/^Key ID:/ {print $3}')
+          export RCLONE_CONFIG_GARAGE_SECRET_ACCESS_KEY=$(echo "$info" | awk '/^Secret key:/ {print $3}')
+          export RCLONE_CONFIG_OFFSITE_REMOTE="R2:$R2_BUCKET"
+          export RCLONE_CONFIG_OFFSITE_PASSWORD=$(rclone obscure "$CRYPT_PASSWORD")
+          export RCLONE_CONFIG_OFFSITE_PASSWORD2=$(rclone obscure "$CRYPT_SALT")
+          rclone sync GARAGE:cnpg OFFSITE:cnpg --transfers 4 --stats-one-line -v
+        '';
+      };
+      systemd.timers.garage-offsite = {
+        wantedBy = [ "timers.target" ];
+        timerConfig = { OnCalendar = "daily"; RandomizedDelaySec = "1h"; Persistent = true; };
+      };
+
 
       networking.firewall.extraCommands = lib.concatMapStrings
         (ip: "iptables -A nixos-fw -p tcp -s ${ip} --dport 3900 -j nixos-fw-accept\n")
