@@ -58,8 +58,6 @@ in
         # Cilium LB-IPAM takes the range as start and stop.
         INGRESS_POOL_START = builtins.head (lib.splitString "-" c.ingress.pool);
         INGRESS_POOL_STOP = lib.last (lib.splitString "-" c.ingress.pool);
-        NFS_SERVER = address "nfs";
-        NFS_SHARE = cluster.storage.path;
         BACKUP_ADDRESS = address "backup";
         MONITORING_ADDRESS = address "monitoring";
       };

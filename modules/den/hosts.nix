@@ -32,8 +32,6 @@ in
       monitoring.nixos.imports = with m; [ monitoring alerting ];
       backup.nixos.imports = [ m.garage ];
       scanner.nixos.imports = [ m.trivy ];
-      nfs.nixos.imports = [ m.storage ];
-      postgres.nixos.imports = [ m.postgres ];
       k3s-node.nixos.imports = [ m.microvm-guest m.k3s-node ];
     }
     # The guest of each host: the k3s node, with the VM's own settings.

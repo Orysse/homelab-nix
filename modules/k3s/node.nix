@@ -199,9 +199,6 @@ in
         };
       };
 
-      # Volumes are NFS mounts from the storage host (csi-driver-nfs mounts through this kernel).
-      boot.supportedFilesystems = [ "nfs" ];
-
       systemd.services.k3s = {
         unitConfig.RequiresMountsFor = [ "/var/lib/rancher" "/persist" ];
         after = [ "systemd-tmpfiles-setup.service" ];

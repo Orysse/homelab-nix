@@ -1,7 +1,7 @@
 # Hourly read-only btrfs snapshots of the data that cannot be rebuilt, in the top-level
 # subvolume @snapshots (outside what they copy). A btrfs snapshot is atomic: a database
 # restored from one recovers like after a crash. Modules that own such data register their
-# subvolume on this instance (postgres.nix, garage.nix, storage.nix).
+# subvolume on this instance (garage.nix).
 # The OpenBao data (@openbao) is shared with the k3s VM (virtiofs, microvm-guest.nix); the
 # daily offsite copy of its latest snapshot is garage.nix.
 { ... }:

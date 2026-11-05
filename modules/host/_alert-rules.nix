@@ -21,7 +21,7 @@ in
           "{{ $labels.host }} restarted"
           "{{ $labels.host }} booted less than 15 minutes ago. Unplanned? Check the power supply, then `journalctl -b -1 | tail`.")
         (alert "HostUnitInactive"
-          "node_systemd_unit_state{job=\"node\",state=\"active\",name=~\"microvm@.+|microvm-virtiofsd@.+|sshd.service|systemd-networkd.service|nfs-server.service|victoria.+|vmalert.+|alertmanager.service|ddclient.timer|btrbk-data.timer|trivy-scan.timer|garage-offsite.timer\"} == 0"
+          "node_systemd_unit_state{job=\"node\",state=\"active\",name=~\"microvm@.+|microvm-virtiofsd@.+|sshd.service|systemd-networkd.service|victoria.+|vmalert.+|alertmanager.service|ddclient.timer|btrbk-data.timer|trivy-scan.timer|garage-offsite.timer\"} == 0"
           "5m" "critical"
           "{{ $labels.host }}: {{ $labels.name }} is not active"
           "`systemctl status {{ $labels.name }}` and `journalctl -u {{ $labels.name }} -n 50` on {{ $labels.host }}.")

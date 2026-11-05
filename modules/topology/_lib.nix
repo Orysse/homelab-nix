@@ -29,21 +29,21 @@ let
   # The services are the peaks of the units; monitoring grows with every host it scrapes
   # (estimated, not measured: measure again in the add-host runbook).
   reserves = {
-    base = 4224;
+    # 4224 + the 128 the host PostgreSQL used to take (removed with the NFS host): the k3s VM
+    # stays at the approved 9216 MB; the 128 are headroom for the host.
+    base = 4352;
     vpn = 128;
     monitoring = 1280;
     monitoringPerHost = 128;
     backup = 128;
     scanner = 1280;
-    nfs = 0;
-    postgres = 128;
   };
 
   # Floor for a k3s VM: the size approved for nuc1 (9216) minus 25%. Below it the check
   # fails instead of starving the cluster.
   memFloor = 6912;
 
-  singletons = [ "vpn" "monitoring" "backup" "nfs" "postgres" ];
+  singletons = [ "vpn" "monitoring" "backup" ];
 
   octets = cluster: lib.concatStringsSep "." (lib.take 3 (lib.splitString "." cluster.network.subnet));
 

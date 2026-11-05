@@ -42,29 +42,16 @@
       gitops.url = "https://github.com/Orysse/homelab-cluster";
     };
 
-    # Where each host service runs. All persistent data lives on the nfs host (NFS to the
-    # nodes, btrfs snapshots): the VMs stay disposable.
+    # Where each host service runs.
     services = {
       vpn.on = "nuc1";          # WireGuard (router: UDP 51820 -> nuc1), Tailscale (UDP 41641), ddclient
       monitoring.on = "nuc1";   # metrics, logs, alerts: below the cluster, it works when the cluster does not
       # Garage (S3) for PostgreSQL backups, until the NAS arrives (then an address, not a host).
       backup.on = "nuc1";
       scanner.on = [ "nuc1" ];  # trivy; a list, so it can run nowhere
-      nfs.on = "nuc1";          # temporary, until phase 4
-      postgres.on = "nuc1";     # apps' PostgreSQL on a local disk (SQLite on NFS corrupts); temporary
     };
 
     vms = { };
-
-    # One database per namespace; OpenBao owns the passwords (homelab-cluster: openbao/).
-    database = {
-      databases = [ "pocket-id" "monitoring" "umami" "headscale" "open-webui" ];
-      # Grafana (its user "monitoring") shows Umami's stats: the analytics tables only, not
-      # Umami's users or API keys.
-      readers = [
-        { role = "monitoring"; database = "umami"; tables = [ "website" "website_event" "session" ]; }
-      ];
-    };
 
     # 10.100.0.0/24 is already used by the school's cyber range tunnel.
     # routes: .192/26 only; the whole /24 would shadow remote LANs in 192.168.1.x.

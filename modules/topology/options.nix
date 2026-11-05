@@ -91,7 +91,7 @@ in
           localDisk = mkOption {
             type = types.ints.positive;
             default = 20480;
-            description = "Size (MiB) of the volume for local PersistentVolumes (/var/lib/local-volumes): databases and other data that must not sit on NFS. A sparse file on the host, kept across VM restarts.";
+            description = "Size (MiB) of the volume for local PersistentVolumes (/var/lib/local-volumes): databases and other data that needs a local disk. A sparse file on the host, kept across VM restarts.";
           };
         };
       });
@@ -118,7 +118,7 @@ in
     services = mkOption {
       description = ''
         Where each host service runs. Placement is always written: nothing moves when a host is
-        added. A singleton (vpn, monitoring, backup, nfs, postgres) names one host; `scanner`
+        added. A singleton (vpn, monitoring, backup) names one host; `scanner`
         is a list, so it can run nowhere.
       '';
       type = types.attrsOf (types.submodule {
@@ -139,30 +139,6 @@ in
       });
     };
 
-    storage.path = mkOption {
-      type = types.str;
-      default = "/srv/data";
-      description = "Exported directory (btrfs subvolume @data); volumes are <path>/<namespace>_<pvc>.";
-    };
-
-    database = {
-      databases = mkOption {
-        type = types.listOf types.str;
-        default = [ ];
-        description = "One database and one user per entry, named after the app's Kubernetes namespace. OpenBao manages the users' passwords.";
-      };
-      readers = mkOption {
-        type = types.listOf (types.submodule {
-          options = {
-            role = mkOption { type = types.str; description = "Existing app user (one of `databases`)."; };
-            database = mkOption { type = types.str; description = "Database it may read."; };
-            tables = mkOption { type = types.listOf types.str; description = "Tables it may SELECT (only these: never a whole schema)."; };
-          };
-        });
-        default = [ ];
-        description = "Read-only access of one app to some tables of another app's database.";
-      };
-    };
 
     vpn = {
       port = mkOption { type = types.port; default = 51820; };

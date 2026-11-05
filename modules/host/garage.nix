@@ -56,8 +56,8 @@ in
       # The units bind-mount these paths (ReadWritePaths): they must exist before Garage starts.
       systemd.tmpfiles.settings.garage."/srv/backups/meta".d = { user = "garage"; group = "garage"; mode = "0750"; };
       systemd.tmpfiles.settings.garage."/srv/backups/data".d = { user = "garage"; group = "garage"; mode = "0750"; };
-      # Nested in @root (created by tmpfiles above, not by disko); snapshotted with @data by
-      # storage.nix's btrbk instance, which mounts the top level at /mnt/btrfs.
+      # Nested in @root (created by tmpfiles above, not by disko); snapshotted by
+      # snapshots.nix (its btrbk instance mounts the top level at /mnt/btrfs).
       services.btrbk.instances.data.settings.volume."/mnt/btrfs".subvolume."@root/srv/backups" = { };
 
       # Layout, bucket and key, created once. The key's secret is read by hand

@@ -43,13 +43,11 @@
                   "/@nix" = { mountpoint = "/nix"; mountOptions = opts; };
                   "/@log" = { mountpoint = "/var/log"; mountOptions = opts; };
                   "/@microvms" = { mountpoint = "/var/lib/microvms"; mountOptions = opts; };
-                  "/@data" = { mountpoint = "/srv/data"; mountOptions = opts; };   # cluster volumes (storage.nix)
-                  "/@db" = { mountpoint = "/var/lib/postgresql"; mountOptions = opts; };   # postgres.nix
                   # SeaweedFS volume data (phase 4): shared with the k3s VM, not snapshotted.
                   "/@seaweed" = { mountpoint = "/srv/seaweed"; mountOptions = opts; };
                   # OpenBao data: snapshotted hourly (snapshots.nix), shared with the k3s VM.
                   "/@openbao" = { mountpoint = "/srv/openbao"; mountOptions = opts; };
-                  "/@snapshots" = { };   # btrbk snapshots of @data (storage.nix), not mounted
+                  "/@snapshots" = { };   # btrbk snapshots (snapshots.nix), not mounted
                 };
             };
           };
