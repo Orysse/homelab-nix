@@ -5,6 +5,9 @@
 { config, lib, ... }:
 let
   inherit (config) cluster;
+  clusterLib = import ../topology/_lib.nix { inherit lib; };
+  c = clusterLib.theCluster cluster;
+  address = service: clusterLib.hostAddress cluster (clusterLib.hostOf cluster service);
 in
 {
   flake.modules.nixos.k3s-bootstrap = {
@@ -35,9 +38,9 @@ in
         ];
         sync = {
           kind = "GitRepository";
-          url = cluster.gitops.url;
-          ref = "refs/heads/${cluster.gitops.branch}";
-          path = cluster.gitops.path;
+          url = c.gitops.url;
+          ref = "refs/heads/${c.gitops.branch}";
+          path = c.gitops.path;
         };
       };
     }];
@@ -48,17 +51,17 @@ in
       metadata = { name = "cluster-vars"; namespace = "flux-system"; };
       data = {
         CLUSTER_NAME = cluster.name;
-        DOMAIN = cluster.ingress.domain;
-        INGRESS_ADDRESS = cluster.ingress.address;
-        INTERNAL_ADDRESS = cluster.ingress.internalAddress;
-        LAPI_ADDRESS = cluster.ingress.lapiAddress;
+        DOMAIN = c.ingress.domain;
+        INGRESS_ADDRESS = c.ingress.address;
+        INTERNAL_ADDRESS = c.ingress.internalAddress;
+        LAPI_ADDRESS = c.ingress.lapiAddress;
         # Cilium LB-IPAM takes the range as start and stop.
-        INGRESS_POOL_START = builtins.head (lib.splitString "-" cluster.ingress.pool);
-        INGRESS_POOL_STOP = lib.last (lib.splitString "-" cluster.ingress.pool);
-        NFS_SERVER = cluster.hosts.${cluster.storage.host}.address;
+        INGRESS_POOL_START = builtins.head (lib.splitString "-" c.ingress.pool);
+        INGRESS_POOL_STOP = lib.last (lib.splitString "-" c.ingress.pool);
+        NFS_SERVER = address "nfs";
         NFS_SHARE = cluster.storage.path;
-        BACKUP_ADDRESS = cluster.hosts.${cluster.backup.host}.address;
-        MONITORING_ADDRESS = cluster.hosts.${cluster.monitoring.host}.address;
+        BACKUP_ADDRESS = address "backup";
+        MONITORING_ADDRESS = address "monitoring";
       };
     }];
   };

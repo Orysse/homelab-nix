@@ -1,9 +1,9 @@
 # ddclient updates records but does not create them: the A records <domain> and
 # *.<domain> (DNS only) must exist in the Cloudflare zone (created on 2026-10-08), and so
 # must those of the other zones below. One token for all zones (DNS Edit on each).
-{ config, ... }:
+{ config, lib, ... }:
 let
-  inherit (config) cluster;
+  cluster = (import ../topology/_lib.nix { inherit lib; }).theCluster config.cluster;
   # Other zones served by the same ingress (homelab-cluster: apps/holive, apps/oxymore).
   otherZones = {
     "holive.fr" = [ "holive.fr" "*.holive.fr" ];

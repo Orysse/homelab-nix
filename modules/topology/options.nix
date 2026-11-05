@@ -1,16 +1,64 @@
 # flake-parts level: every host reads the same topology.
-# address = null: DHCP; the machine stays reachable over mDNS (<name>.local).
+# Hosts are hardware only. Workloads (the cluster, host services, extra VMs) are placed on
+# hosts by name; addresses, VM names, MACs and the k3s VM's memory are derived (_lib.nix).
 { lib, ... }:
 let
   inherit (lib) mkOption types;
-  address = mkOption {
-    type = types.nullOr types.str;
-    default = null;
-    description = "Static IPv4, or null for DHCP.";
+
+  ingress = {
+    address = mkOption {
+      type = types.str;
+      description = "The public Gateway's LoadBalancer IP (target of the router's port forwarding).";
+    };
+    lapiAddress = mkOption {
+      type = types.str;
+      description = "LoadBalancer IP of CrowdSec's LAPI, for the firewall bouncer on the physical hosts. In the pool, not port-forwarded.";
+    };
+    internalAddress = mkOption {
+      type = types.str;
+      description = "Second LoadBalancer IP (Gateway internal), for internal apps (*.int.<domain>). Must NOT be port-forwarded.";
+    };
+    pool = mkOption {
+      type = types.str;
+      description = "IP range Cilium may assign to LoadBalancer Services (must contain `address`), e.g. 192.168.1.240-192.168.1.254.";
+    };
+    domain = mkOption {
+      type = types.str;
+      description = "Apps domain: <app>.<domain>.";
+    };
+  };
+
+  oidc = {
+    issuer = mkOption {
+      type = types.str;
+      description = "OIDC issuer the Kubernetes API trusts for people (Pocket-ID, in the cluster).";
+    };
+    audiences = mkOption {
+      type = types.listOf types.str;
+      description = "Client IDs (public values) whose ID tokens the API accepts: kubectl, Headlamp…";
+    };
+  };
+
+  gitops = {
+    url = mkOption {
+      type = types.str;
+      description = "Git URL (HTTPS, public repository) of homelab-cluster.";
+    };
+    branch = mkOption { type = types.str; default = "main"; };
+    path = mkOption {
+      type = types.str;
+      default = "./clusters/homelab";
+      description = "Repository directory applied by Flux (cluster entry point).";
+    };
   };
 in
 {
   options.cluster = {
+    name = mkOption {
+      type = types.str;
+      description = "Name of the cluster in `clusters` (also the `cluster` label on metrics and logs).";
+    };
+
     network = {
       subnet = mkOption {
         type = types.nullOr types.str;
@@ -22,46 +70,82 @@ in
       dns = mkOption { type = types.listOf types.str; default = [ ]; };
     };
 
-    ingress = {
-      address = mkOption {
-        type = types.str;
-        description = "The public Gateway's LoadBalancer IP (target of the router's port forwarding).";
-      };
-      lapiAddress = mkOption {
-        type = types.str;
-        description = "LoadBalancer IP of CrowdSec's LAPI, for the firewall bouncer on the physical hosts. In the pool, not port-forwarded.";
-      };
-      internalAddress = mkOption {
-        type = types.str;
-        description = "Second LoadBalancer IP (Gateway internal), for internal apps (*.int.<domain>). Must NOT be port-forwarded.";
-      };
-      pool = mkOption {
-        type = types.str;
-        description = "IP range Cilium may assign to LoadBalancer Services (must contain `address`), e.g. 192.168.1.240-192.168.1.254.";
-      };
-      domain = mkOption {
-        type = types.str;
-        description = "Apps domain: <app>.<domain>.";
-      };
+    hosts = mkOption {
+      description = ''
+        Physical machines, hardware only. A host's address is `<subnet>.20<id>`, and the VM of
+        its k3s node `kube-<id>` is `<subnet>.21<id>`.
+      '';
+      type = types.attrsOf (types.submodule {
+        options = {
+          id = mkOption {
+            type = types.ints.between 0 9;
+            description = "Stable identity, given in join order (nuc1 = 0).";
+          };
+          ram = mkOption { type = types.ints.positive; description = "Physical RAM (MB)."; };
+          cores = mkOption { type = types.ints.positive; description = "vCPUs of the host's k3s VM."; };
+          dataDisk = mkOption {
+            type = types.ints.positive;
+            default = 32768;
+            description = "Size (MiB) of the k3s data volume (/var/lib/rancher), a sparse file on the host.";
+          };
+          localDisk = mkOption {
+            type = types.ints.positive;
+            default = 20480;
+            description = "Size (MiB) of the volume for local PersistentVolumes (/var/lib/local-volumes): databases and other data that must not sit on NFS. A sparse file on the host, kept across VM restarts.";
+          };
+        };
+      });
     };
 
-    storage = {
-      host = mkOption {
-        type = types.str;
-        description = "Physical host holding all persistent data (NFS server for the cluster). The VMs keep no state.";
-      };
-      path = mkOption {
-        type = types.str;
-        default = "/srv/data";
-        description = "Exported directory (btrfs subvolume @data); volumes are <path>/<namespace>_<pvc>.";
-      };
+    clusters = mkOption {
+      description = "k3s clusters: one k3s VM per listed host.";
+      type = types.attrsOf (types.submodule {
+        options = {
+          servers = mkOption {
+            type = types.listOf types.str;
+            description = "Hosts whose VM is a k3s server (etcd). An odd count; the first (sorted) bootstraps.";
+          };
+          agents = mkOption {
+            type = types.nullOr (types.listOf types.str);
+            default = null;
+            description = "Hosts whose VM is an agent. null: every host that is not a server.";
+          };
+          inherit gitops oidc ingress;
+        };
+      });
+    };
+
+    services = mkOption {
+      description = ''
+        Where each host service runs. Placement is always written: nothing moves when a host is
+        added. A singleton (vpn, monitoring, backup, nfs, postgres) names one host; `scanner`
+        is a list, so it can run nowhere.
+      '';
+      type = types.attrsOf (types.submodule {
+        options.on = mkOption { type = types.either types.str (types.listOf types.str); };
+      });
+    };
+
+    vms = mkOption {
+      description = "Extra microVMs (not the k3s node), placed on a host.";
+      default = { };
+      type = types.attrsOf (types.submodule {
+        options = {
+          on = mkOption { type = types.str; description = "Host that runs the VM."; };
+          mem = mkOption { type = types.ints.positive; description = "RAM in MB, taken from the host's k3s VM."; };
+          address = mkOption { type = types.str; description = "Static IPv4 on the LAN, outside .21x, the DHCP range and the LB pool."; };
+          module = mkOption { type = types.deferredModule; default = { }; description = "NixOS module of the guest."; };
+        };
+      });
+    };
+
+    storage.path = mkOption {
+      type = types.str;
+      default = "/srv/data";
+      description = "Exported directory (btrfs subvolume @data); volumes are <path>/<namespace>_<pvc>.";
     };
 
     database = {
-      host = mkOption {
-        type = types.str;
-        description = "Physical host running PostgreSQL for the cluster's apps (data on its local disk, never NFS).";
-      };
       databases = mkOption {
         type = types.listOf types.str;
         default = [ ];
@@ -80,37 +164,7 @@ in
       };
     };
 
-    oidc = {
-      issuer = mkOption {
-        type = types.str;
-        description = "OIDC issuer the Kubernetes API trusts for people (Pocket-ID, in the cluster).";
-      };
-      audiences = mkOption {
-        type = types.listOf types.str;
-        description = "Client IDs (public values) whose ID tokens the API accepts: kubectl, Headlamp…";
-      };
-    };
-
-    backup.host = mkOption {
-      type = types.str;
-      description = "Physical host running the S3 store (Garage) that cluster backups go to. Meant to become the NAS, which will be an address rather than a host of this topology.";
-    };
-
-    monitoring.host = mkOption {
-      type = types.str;
-      description = "Physical host running the monitoring backends (VictoriaMetrics, VictoriaLogs, Grafana). Below the cluster: it must work when the cluster does not.";
-    };
-
-    name = mkOption {
-      type = types.str;
-      description = "Cluster name (the `cluster` label on metrics and logs).";
-    };
-
     vpn = {
-      host = mkOption {
-        type = types.str;
-        description = "Physical host running the WireGuard server (target of the router's UDP forwarding).";
-      };
       port = mkOption { type = types.port; default = 51820; };
       endpoint = mkOption {
         type = types.str;
@@ -152,58 +206,6 @@ in
           };
         });
       };
-    };
-
-    gitops = {
-      url = mkOption {
-        type = types.str;
-        description = "Git URL (HTTPS, public repository) of homelab-cluster.";
-      };
-      branch = mkOption { type = types.str; default = "main"; };
-      path = mkOption {
-        type = types.str;
-        default = "./clusters/homelab";
-        description = "Repository directory applied by Flux (cluster entry point).";
-      };
-    };
-
-    hosts = mkOption {
-      type = types.attrsOf (types.submodule {
-        options = { inherit address; };
-      });
-    };
-
-    nodes = mkOption {
-      type = types.attrsOf (types.submodule {
-        options = {
-          inherit address;
-          host = mkOption { type = types.str; };
-          role = mkOption {
-            type = types.enum [ "server" "agent" ];
-            description = "Selects the k3s role.";
-          };
-          mem = mkOption {
-            type = types.ints.positive;
-            description = "RAM in MB (reserved on the host).";
-          };
-          vcpu = mkOption { type = types.ints.positive; };
-          balloon = mkOption {
-            type = types.bool;
-            default = false;
-            description = "virtio-balloon with free page reporting: the guest hands the memory it frees back to the host (microvm.balloon). On all nodes since 2026-10-12; little gain so far (the guests keep their free RAM as page cache).";
-          };
-          dataDisk = mkOption {
-            type = types.ints.positive;
-            default = 32768;
-            description = "Size (MiB) of the k3s data volume (/var/lib/rancher), a sparse file on the host.";
-          };
-          localDisk = mkOption {
-            type = types.ints.positive;
-            default = 20480;
-            description = "Size (MiB) of the volume for local PersistentVolumes (/var/lib/local-volumes): databases and other data that must not sit on NFS. A sparse file on the host, kept across VM restarts.";
-          };
-        };
-      });
     };
   };
 }

@@ -55,7 +55,7 @@ in
         '';
       };
     in
-    lib.mkIf (cluster.monitoring.host == config.networking.hostName) {
+    {
       users.users.trivy = { isSystemUser = true; group = "trivy"; };
       users.groups.trivy = { };
 

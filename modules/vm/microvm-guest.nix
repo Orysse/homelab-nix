@@ -1,14 +1,15 @@
-# `node` (specialArgs): the node's name in the topology.
+# `vm` (specialArgs): the k3s VM of this host, from the topology (_lib.nix k3sVmOf).
 { config, ... }:
 let
   inherit (config) cluster;
   topModules = config.flake.modules.nixos;
 in
 {
-  flake.modules.nixos.microvm-guest = { lib, node, ... }:
+  flake.modules.nixos.microvm-guest = { lib, vm, ... }:
     let
       clusterLib = import ../topology/_lib.nix { inherit lib; };
-      spec = cluster.nodes.${node};
+      node = vm.name;
+      spec = vm;
     in
     {
       imports = [ topModules.base topModules.users-ssh ];
@@ -18,10 +19,6 @@ in
       microvm = {
         hypervisor = "qemu";
         inherit (spec) mem vcpu;
-        # Free page reporting (topology nodes.<n>.balloon): the RAM the guest frees goes back
-        # to the host; without it, a page the guest touched stays the VM's for good.
-        inherit (spec) balloon;
-
         interfaces = [{
           type = "tap";
           id = clusterLib.tapOf node;
@@ -66,7 +63,7 @@ in
       services.journald.upload = {
         enable = true;
         settings.Upload.URL =
-          "http://${cluster.hosts.${cluster.monitoring.host}.address}:9428/insert/journald";
+          "http://${clusterLib.hostAddress cluster (clusterLib.hostOf cluster "monitoring")}:9428/insert/journald";
       };
 
       services.resolved.settings.Resolve.MulticastDNS = "yes";

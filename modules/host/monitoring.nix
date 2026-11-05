@@ -12,9 +12,10 @@ in
 {
   flake.modules.nixos.monitoring = { config, lib, pkgs, ... }:
     let
-      domain = cluster.ingress.domain;
+      domain = (clusterLib.theCluster cluster).ingress.domain;
       host = config.networking.hostName;
-      nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
+      clusterLib = import ../topology/_lib.nix { inherit lib; };
+      nodeIPs = clusterLib.vmIPs cluster;
       fromNodes = port: lib.concatMapStrings
         (ip: "iptables -A nixos-fw -p tcp -s ${ip} --dport ${toString port} -j nixos-fw-accept\n")
         nodeIPs;
@@ -26,7 +27,7 @@ in
         AllowedIPs = ${peer.address}/32
       '') cluster.vpn.peers));
     in
-    lib.mkIf (cluster.monitoring.host == host) {
+    {
       services.victoriametrics = {
         enable = true;
         listenAddress = ":8428";

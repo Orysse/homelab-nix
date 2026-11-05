@@ -14,11 +14,12 @@ in
 {
   flake.modules.nixos.alerting = { config, lib, ... }:
     let
-      domain = cluster.ingress.domain;
-      nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
+      domain = (clusterLib.theCluster cluster).ingress.domain;
+      clusterLib = import ../topology/_lib.nix { inherit lib; };
+      nodeIPs = clusterLib.vmIPs cluster;
       mailbox = "homelab@${domain}";
     in
-    lib.mkIf (cluster.monitoring.host == config.networking.hostName) {
+    {
       services.vmalert.instances.homelab = {
         enable = true;
         # Alert rules, plus the power estimate's recording rules (_power-rules.nix, tested by power.nix).

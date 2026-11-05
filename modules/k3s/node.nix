@@ -7,13 +7,13 @@ let
   bootstrapModule = config.flake.modules.nixos.k3s-bootstrap;
 in
 {
-  flake.modules.nixos.k3s-node = { lib, pkgs, node, ... }:
+  flake.modules.nixos.k3s-node = { lib, pkgs, vm, ... }:
     let
       clusterLib = import ../topology/_lib.nix { inherit lib; };
-      spec = cluster.nodes.${node};
-      bootstrap = clusterLib.bootstrapServer cluster;
-      isServer = spec.role == "server";
-      isBootstrap = node == bootstrap;
+      node = vm.name;
+      spec = vm;
+      isServer = vm.k3sRole == "server";
+      isBootstrap = vm.isBootstrap;
     in
     {
       imports = lib.optional isBootstrap bootstrapModule;
@@ -67,7 +67,7 @@ in
         # Kubernetes minor version, pinned: a flake update only brings its patch releases.
         # Upgrading = one minor at a time (k3s_1_37, then the next), servers before agents.
         package = pkgs.k3s_1_36;
-        role = spec.role;
+        role = spec.k3sRole;
         tokenFile = "/persist/k3s-token";
         nodeName = node;
         nodeIP = spec.address;
@@ -76,7 +76,7 @@ in
         # nor Traefik. local-storage: homelab-cluster ships its own local-path provisioner.
         disable = lib.optionals isServer [ "servicelb" "traefik" "local-storage" ];
         serverAddr = lib.optionalString (!isBootstrap)
-          "https://${clusterLib.endpointOf bootstrap cluster.nodes.${bootstrap}}:6443";
+          "https://${clusterLib.serverAddress cluster}:6443";
         # The 127.0.0.53 stub is unreachable from pods (kubelet would fall back to 8.8.8.8).
         extraFlags = [
           "--resolv-conf=/run/systemd/resolve/resolv.conf"
@@ -135,8 +135,8 @@ in
           anonymous.enabled = false;
           jwt = [{
             issuer = {
-              url = cluster.oidc.issuer;
-              audiences = cluster.oidc.audiences;
+              url = (clusterLib.theCluster cluster).oidc.issuer;
+              audiences = (clusterLib.theCluster cluster).oidc.audiences;
               audienceMatchPolicy = "MatchAny";
             };
             claimMappings = {
@@ -213,7 +213,7 @@ in
       # peers (4244), Cilium WireGuard (51871).
       networking.firewall =
         let
-          nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
+          nodeIPs = clusterLib.vmIPs cluster;
           fromNodes = proto: port: lib.concatMapStrings
             (ip: "iptables -A nixos-fw -p ${proto} -s ${ip} --dport ${port} -j nixos-fw-accept\n")
             nodeIPs;

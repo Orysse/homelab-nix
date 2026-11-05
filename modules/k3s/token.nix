@@ -8,7 +8,8 @@ in
   flake.modules.nixos.k3s-token = { config, lib, pkgs, ... }:
     let
       clusterLib = import ../topology/_lib.nix { inherit lib; };
-      nodes = lib.attrNames (clusterLib.nodesOn cluster config.networking.hostName);
+      vm = clusterLib.k3sVmOf cluster config.networking.hostName;
+      nodes = lib.optional (vm != null) vm.name;
       tokenPath = "/var/lib/homelab/k3s-token";
     in
     {

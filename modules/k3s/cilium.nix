@@ -16,7 +16,6 @@ in
   flake.modules.nixos.k3s-bootstrap = { lib, ... }:
     let
       clusterLib = import ../topology/_lib.nix { inherit lib; };
-      bootstrap = clusterLib.bootstrapServer cluster;
     in
     {
       services.k3s.autoDeployCharts.cilium = {
@@ -30,7 +29,7 @@ in
         values = {
           # No kube-proxy: Cilium reaches the API server directly, not through its Service.
           kubeProxyReplacement = true;
-          k8sServiceHost = clusterLib.endpointOf bootstrap cluster.nodes.${bootstrap};
+          k8sServiceHost = clusterLib.serverAddress cluster;
           k8sServicePort = 6443;
 
           ipam.mode = "kubernetes";              # the node pod CIDRs k3s assigns (10.42.x.0/24)

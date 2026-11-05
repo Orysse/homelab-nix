@@ -11,10 +11,11 @@ in
 {
   flake.modules.nixos.garage = { config, lib, pkgs, ... }:
     let
-      nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
+      clusterLib = import ../topology/_lib.nix { inherit lib; };
+      nodeIPs = clusterLib.vmIPs cluster;
       garage = "${config.services.garage.package}/bin/garage";
     in
-    lib.mkIf (cluster.backup.host == config.networking.hostName) {
+    {
       sops.secrets.garage-rpc-secret = { };
       sops.templates."garage.env".content =
         "GARAGE_RPC_SECRET=${config.sops.placeholder.garage-rpc-secret}";

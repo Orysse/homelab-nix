@@ -11,11 +11,12 @@ in
 {
   flake.modules.nixos.postgres = { config, lib, pkgs, ... }:
     let
-      nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
+      clusterLib = import ../topology/_lib.nix { inherit lib; };
+      nodeIPs = clusterLib.vmIPs cluster;
       dbs = cluster.database.databases;
       psql = "${config.services.postgresql.package}/bin/psql";
     in
-    lib.mkIf (cluster.database.host == config.networking.hostName) {
+    {
       services.postgresql = {
         enable = true;
         package = pkgs.postgresql_18;
@@ -81,6 +82,6 @@ in
 
       # Snapshotted with @data by the storage host's btrbk (same host today).
       services.btrbk.instances.data.settings.volume."/mnt/btrfs".subvolume."@db" =
-        lib.mkIf (cluster.storage.host == config.networking.hostName) { };
+        lib.mkIf (lib.elem "nfs" (clusterLib.servicesOn cluster config.networking.hostName)) { };
     };
 }

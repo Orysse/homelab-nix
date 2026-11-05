@@ -10,10 +10,11 @@ in
 {
   flake.modules.nixos.storage = { config, lib, ... }:
     let
-      nodeIPs = lib.filter (a: a != null) (lib.mapAttrsToList (_: n: n.address) cluster.nodes);
+      clusterLib = import ../topology/_lib.nix { inherit lib; };
+      nodeIPs = clusterLib.vmIPs cluster;
       path = cluster.storage.path;
     in
-    lib.mkIf (cluster.storage.host == config.networking.hostName) {
+    {
       services.nfs.server = {
         enable = true;
         # no_root_squash: the CSI controller creates and deletes volume directories as root;

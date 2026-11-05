@@ -17,7 +17,7 @@ in
     let
       clusterLib = import ../topology/_lib.nix { inherit lib; };
     in
-    lib.mkIf (clusterLib.nodesOn cluster config.networking.hostName != { }) {
+    lib.mkIf (clusterLib.k3sVmOf cluster config.networking.hostName != null) {
       boot.kernelModules = [ "br_netfilter" ];
       boot.kernel.sysctl = {
         "net.bridge.bridge-nf-call-iptables" = 1;
@@ -40,7 +40,7 @@ in
         secrets.apiKeyPath = config.sops.secrets.crowdsec-bouncer-key.path;
         settings = {
           mode = "nftables";
-          api_url = "http://${cluster.ingress.lapiAddress}:8080/";
+          api_url = "http://${(clusterLib.theCluster cluster).ingress.lapiAddress}:8080/";
           update_frequency = "10s";
           # The bouncer creates and owns its tables (crowdsec, crowdsec6) and their chains.
           nftables = {

@@ -6,10 +6,11 @@
 { config, inputs, lib, ... }:
 let
   inherit (config) cluster;
+  clusterLib = import ./topology/_lib.nix { inherit lib; };
 in
 {
   flake.deploy.nodes = lib.mapAttrs (name: host: {
-    hostname = host.address;
+    hostname = clusterLib.hostAddress cluster name;
     sshUser = "root";
     profiles.system = {
       user = "root";

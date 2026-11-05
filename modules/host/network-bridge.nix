@@ -31,7 +31,7 @@ in
       systemd.network.networks."10-br0" = {
         matchConfig.Name = "br0";
         networkConfig = clusterLib.lanNetworkConfig cluster
-          cluster.hosts.${config.networking.hostName}.address;
+          (clusterLib.hostAddress cluster config.networking.hostName);
         linkConfig.RequiredForOnline = "routable";
       };
 
