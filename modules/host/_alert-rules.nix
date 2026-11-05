@@ -28,8 +28,8 @@ in
         (alert "OffsiteCopyFailed"
           "node_systemd_unit_state{job=\"node\",state=\"failed\",name=\"garage-offsite.service\"} == 1"
           "0m" "warning"
-          "{{ $labels.host }}: the offsite copy of the backups failed"
-          "`journalctl -u garage-offsite -n 50` on {{ $labels.host }}: expired R2 token, quota, or the network.")
+          "{{ $labels.host }}: the offsite copy of the backups failed or is over 8 GB"
+          "`journalctl -u garage-offsite -n 50` on {{ $labels.host }}: expired R2 token, the network, or the copy nearing the 10 GB R2 free tier (barman retention, `rclone size`).")
         (alert "HostDiskFilling"
           "1 - node_filesystem_avail_bytes{job=\"node\",fstype=\"btrfs\"} / node_filesystem_size_bytes{job=\"node\",fstype=\"btrfs\"} > 0.85"
           "30m" "warning"

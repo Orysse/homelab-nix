@@ -114,7 +114,7 @@ in
         description = "Encrypted copy of the Garage buckets to Cloudflare R2";
         after = [ "garage-setup.service" ];
         requires = [ "garage-setup.service" ];
-        path = [ pkgs.rclone pkgs.gawk ];
+        path = [ pkgs.rclone pkgs.gawk pkgs.jq ];
         environment = {
           RCLONE_CONFIG_GARAGE_TYPE = "s3";
           RCLONE_CONFIG_GARAGE_PROVIDER = "Other";
@@ -141,6 +141,10 @@ in
           export RCLONE_CONFIG_OFFSITE_PASSWORD=$(rclone obscure "$CRYPT_PASSWORD")
           export RCLONE_CONFIG_OFFSITE_PASSWORD2=$(rclone obscure "$CRYPT_SALT")
           rclone sync GARAGE:cnpg OFFSITE:cnpg --transfers 4 --stats-one-line -v
+          # R2 free tier: 10 GB stored. Fail (-> OffsiteCopyFailed) from 8 GB, while there is time.
+          bytes=$(rclone size --json OFFSITE:cnpg | jq .bytes)
+          echo "offsite copy: $bytes bytes"
+          [ "$bytes" -lt 8000000000 ]
         '';
       };
       systemd.timers.garage-offsite = {
