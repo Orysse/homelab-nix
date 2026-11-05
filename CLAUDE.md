@@ -8,48 +8,55 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 
 ## Current state
 
-- Phase 1 (host + microVMs) done, gates G0–G6 validated on 2026-10-07.
-- k3s: `kube-1` server (etcd, `clusterInit`), `kube-2`/`kube-3` agents (`modules/k3s/`).
-- Cluster content (cert-manager, storage, OpenBao, Pocket-ID, Headscale, Headlamp,
-  CrowdSec, monitoring collectors, Grafana, apps) lives in the `homelab-cluster` repository,
-  applied by Flux. Do not redeclare it here. v3 rewrite in progress (branch `v3` in both
-  repos, spec in homelab-cluster `docs/superpowers/specs/2026-10-29-cluster-v3-design.md`).
-- Entry point: Cilium Gateway on `192.168.1.240` (Cilium LB-IPAM, L2 announcements; no
-  Traefik, no MetalLB since v3), apps on `<app>.abe.lc`, wildcard
-  Let's Encrypt certificate. Router port forwarding: TCP 80/443 -> `.240`, UDP 51820 and 41641 -> nuc1.
-- Secrets: sops-nix on the host (`secrets/nuc1.yaml`); in the cluster, OpenBao for apps and
-  sops (Flux) for bootstrap only.
+- Hosts and VMs: nuc1 (`192.168.1.200`, host id 0) runs one k3s VM, `kube-0` (`.210`,
+  server, embedded etcd), 9216 MB: derived from the host's RAM minus the reserves of what
+  runs on it, floor 6912 MB (`modules/topology/_lib.nix`, checked by `nix flake check`).
+  Never change a VM's size or limits without the owner's OK: the VM is the only node.
+  A new host is data only: `docs/runbooks/add-host.md`.
+- Topology: `modules/topology/topology.nix` holds hardware (`hosts`), the cluster, and where
+  host services run (`services.<name>.on`); den (`modules/den/`, pinned v0.19.0) turns that
+  into one configuration per host. Building blocks stay `flake.modules.nixos.*`.
+- Cluster content (cert-manager, storage classes, OpenBao, Pocket-ID, Headscale, Lidarr,
+  Navidrome, Syncthing, monitoring collectors, Grafana, apps) lives in the `homelab-cluster`
+  repository, applied by Flux. Do not redeclare it here.
+- Entry point: Cilium Gateways, public `192.168.1.240`, internal `.241` (Cilium LB-IPAM, L2
+  announcements; no Traefik, no MetalLB), apps on `<app>.abe.lc` and `<app>.int.abe.lc`,
+  wildcard Let's Encrypt certificate. Router: TCP 80/443 → `.240`, UDP 51820 and 41641 → nuc1.
+- Secrets: sops-nix on the hosts (`secrets/<host>.yaml`, and `secrets/cluster.yaml` for what
+  every host shares: the k3s token); in the cluster, OpenBao for apps and sops (Flux) for
+  bootstrap only.
 - VPN: Tailscale with Headscale in the cluster (`hs.abe.lc`, Pocket-ID login), nuc1 is the
-  subnet router and an exit node for admins (`host/tailscale.nix`). WireGuard on nuc1 (`10.250.0.0/24`) stays as
-  break-glass for the owner's laptop. Dynamic DNS (ddclient) runs on nuc1.
-  No impermanence on the host (D1 revised).
-- Storage: NFS from nuc1 (`/srv/data`, btrbk snapshots, D21) for small app files; since v3 a
-  local volume per VM (`/var/lib/local-volumes`, topology `localDisk`) for PostgreSQL. Backups:
-  Garage (S3) on nuc1 (`host/garage.nix`, `/srv/backups`), until the NAS.
-  No state inside the VMs other than that local volume.
-- Monitoring (D23): VictoriaMetrics, VictoriaLogs, vmalert, Alertmanager on nuc1 (alerts emailed
-  from homelab@abe.lc to the owner's address, sops `alert-email`; heartbeat to Healthchecks.io); Grafana at `grafana.int.abe.lc`, in
-  the cluster. Host rule: D22.
-- Databases (D24, D28): v3 moves them into the cluster (CloudNativePG, homelab-cluster ADR 0006);
-  `host/postgres.nix` on nuc1 stays until the cutover import and a restore test are done. v2: one
-  database per app namespace, passwords owned by OpenBao.
-- Identity (D25): Pocket-ID at `auth.abe.lc`; the k3s API server accepts its tokens
-  (topology `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.abe.lc`. Since v3
-  Pocket-ID runs from its operator, OIDC clients are objects next to each app (ADR 0004).
-  Groups: `admins` (cluster-admin), `visitors` (read-only); API audit log (people only) in
-  VictoriaLogs.
+  subnet router and an exit node for admins (`host/tailscale.nix`). WireGuard on nuc1
+  (`10.250.0.0/24`) stays as break-glass. Dynamic DNS (ddclient) on nuc1. No impermanence on
+  the host (D1 revised).
+- Storage (D32): default class `local` (VM `local.img`, preallocated); `seaweedfs` for bulk
+  files (data on host subvolume `@seaweed`); OpenBao on host subvolume `@openbao` (hourly
+  btrbk snapshots). No NFS, no PostgreSQL on the host. Databases: CloudNativePG in the
+  cluster (ADR 0006), backups in Garage on nuc1 (`host/garage.nix`), copied daily and
+  encrypted to Cloudflare R2 (D31; stays under 8 GB, the unit fails above).
+- Monitoring (D23): VictoriaMetrics, VictoriaLogs, vmalert, Alertmanager on nuc1 (alerts
+  emailed from homelab@abe.lc to the owner's address, sops `alert-email`; heartbeat to
+  Healthchecks.io); every host exports its own metrics (`host/telemetry.nix`); Grafana at
+  `grafana.int.abe.lc`, in the cluster. Host rule: D22.
+- Identity (D25): Pocket-ID at `auth.abe.lc`; the k3s API server accepts its tokens (topology
+  `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.abe.lc`; Hubble, Lidarr
+  and Navidrome behind oauth2-proxy. Groups: `admins` (cluster-admin), `visitors`.
 - Network (D27): Cilium (native routing, kube-proxy replacement, WireGuard, Hubble at
-  `hubble.int.abe.lc`), installed by the base (`k3s/cilium.nix`); since v3 also LB-IPAM, L2
-  announcements and Gateway API (ADR 0002). Flux itself: Flux Operator + FluxInstance (`k3s/flux.nix`).
-- Updates (D26): Renovate PRs (weekly `flake.lock`), CI runs `nix flake check`, deploy by hand.
-  k3s pinned to `k3s_1_36`, PostgreSQL to 18.
-- nuc1: new PSU since 2026-10-11, BIOS power limits (the 65 W one needed a 25 W software cap). NIC offloads off
-  (e1000e hang, 2026-10-09).
-- Memory (collapse of 2026-10-11): zram swap in the VMs, kubelet LimitedSwap, eviction at
-  300 Mi, 1 Gi reserved for the control plane on kube-1 (`k3s/node.nix`). Headroom is small:
-  check real free memory before adding an app; VM sizes stay 4000/3500/3500 MB.
+  `hubble.int.abe.lc`), installed by the base (`k3s/cilium.nix`). Flux: Flux Operator +
+  FluxInstance (`k3s/flux.nix`).
+- Updates (D26): Renovate PRs (weekly `flake.lock`), CI runs `nix flake check`, deploy by
+  hand. k3s pinned to `k3s_1_36`.
+- nuc1: new PSU since 2026-10-11, BIOS power limits. NIC offloads off (e1000e hang,
+  2026-10-09).
+- Memory: zram swap in the VM, kubelet LimitedSwap, eviction at 300 Mi. Check real free
+  memory before adding an app (collapse of 2026-10-11).
 - Addressing: `docs/facts.md`. Kubeconfigs (outside the repo): `~/.kube/configs/homelab-oidc.yaml`
-  (Pocket-ID, daily use; public copy in homelab-cluster `docs/onboarding/kubeconfig.yaml`), `homelab-nix.yaml` (admin certificate, break-glass).
+  (Pocket-ID, daily use; public copy in homelab-cluster `docs/onboarding/kubeconfig.yaml`),
+  `homelab-nix.yaml` (admin certificate, break-glass).
+- Procedures: `docs/runbooks/` (bootstrap from an empty disk, add a host, lose a host), all
+  written and none rehearsed yet.
+- Open: CrowdSec's host bouncer stays until the v3 spike says otherwise; Mullvad for the
+  download client is not ordered yet (D31 and open questions in `docs/03-…`).
 
 Update this section when the state changes.
 
@@ -58,7 +65,8 @@ Update this section when the state changes.
 1. `docs/00-architecture.md` — principles, data model, layers.
 2. `docs/03-decisions-and-open-questions.md` — decisions taken and open questions.
 3. `docs/04-workloads.md` — boundary between this repository and `homelab-cluster`.
-4. The original phase 1 and phase 2 plans are in git history (removed 2026-10-11).
+4. `docs/runbooks/`: bootstrap from an empty disk, add a host, lose a host.
+5. The original phase 1 and phase 2 plans are in git history (removed 2026-10-11).
 
 ## Non-negotiable principles
 
