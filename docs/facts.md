@@ -6,7 +6,7 @@
 | Host | `nuc1`, NUC10i7FNH, 12 threads (VT-x OK), 16 GB RAM, UEFI |
 | Disk | Kingston SNVS500G NVMe, 466 GB: `/dev/disk/by-id/nvme-KINGSTON_SNVS500G_50026B7685AD8136` |
 | Network | Home router LAN `192.168.1.0/24`, gateway + DNS `192.168.1.1`. Router DHCP: `.10`–`.150`. A Google Wifi sits behind it (own NAT, `192.168.86.0/24`) |
-| Static addressing (outside DHCP) | `.200`–`.209` hosts (host id N = `.20N`, `nuc1` = id 0 = `.200`); `.210`–`.239` k3s VMs (`kube-N` = `.21N`, so `kube-0` = `.210`); `.240`–`.254` LoadBalancers (Cilium LB-IPAM) |
+| Static addressing (outside DHCP) | `.200`–`.209` hosts (host id N = `.20N`, `nuc1` = id 0 = `.200`); `.210`–`.239` k3s VMs (`kube-N` = `.21N`, so `kube-0` = `.210`); `.240`–`.254` LoadBalancers (Cilium LB-IPAM): `.240` public Gateway, `.241` internal Gateway, `.242` CrowdSec LAPI, `.243` Syncthing sync port (22000, LAN only, never forwarded) |
 | Port forwarding | TCP 80/443 → `192.168.1.240`; UDP 51820 (WireGuard) and 41641 (Tailscale direct connections) → `192.168.1.200` |
 | Domain | `abe.lc` (registrar OVH, DNS Cloudflare); `abe.lc` and `*.abe.lc` → public IP via ddclient |
 | VPN | Tailscale (control server Headscale at `hs.abe.lc`, in the cluster; `nuc1` routes `192.168.1.192/26`). WireGuard `10.250.0.0/24` on `nuc1` (`10.250.0.1`) as break-glass |
