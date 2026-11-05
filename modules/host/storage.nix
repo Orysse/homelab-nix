@@ -2,7 +2,7 @@
 # @data (disk-layout.nix), exported over NFSv4 to the nodes only. The VMs keep no state, so
 # they stay disposable. In the cluster: csi-driver-nfs, StorageClass "nfs", one directory
 # per volume (<namespace>_<pvc>).
-# Snapshots: btrbk, hourly, read-only, in the top-level subvolume @snapshots (outside @data).
+# Snapshots: snapshots.nix (btrbk, hourly, @snapshots).
 { config, ... }:
 let
   inherit (config) cluster;
@@ -30,25 +30,7 @@ in
         (ip: "iptables -A nixos-fw -p tcp -s ${ip} --dport 2049 -j nixos-fw-accept\n")
         nodeIPs;
 
-      # btrbk works on the top level of the filesystem: @data is snapshotted into @snapshots.
-      fileSystems."/mnt/btrfs" = {
-        device = config.fileSystems."/".device;
-        fsType = "btrfs";
-        options = [ "subvolid=5" "noatime" ];
-      };
-      systemd.services.btrbk-data.unitConfig.RequiresMountsFor = [ "/mnt/btrfs" ];
-
-      services.btrbk.instances.data = {
-        onCalendar = "hourly";
-        settings = {
-          timestamp_format = "long";
-          snapshot_preserve_min = "6h";
-          snapshot_preserve = "48h 14d 8w";
-          volume."/mnt/btrfs" = {
-            snapshot_dir = "@snapshots";
-            subvolume."@data" = { };
-          };
-        };
-      };
+      # Snapshots: snapshots.nix; @data is registered on its btrbk instance.
+      services.btrbk.instances.data.settings.volume."/mnt/btrfs".subvolume."@data" = { };
     };
 }

@@ -38,6 +38,13 @@ in
             tag = "persist";
             proto = "virtiofs";
           }
+          # OpenBao's data (pebbledb): a host subvolume so that it is snapshotted (snapshots.nix).
+          {
+            source = "/srv/openbao";
+            mountPoint = "/var/lib/openbao";
+            tag = "openbao";
+            proto = "virtiofs";
+          }
           # SeaweedFS volume server data: outlives the VM and the cluster (disk-layout.nix).
           {
             source = "/srv/seaweed";

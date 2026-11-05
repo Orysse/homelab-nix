@@ -114,6 +114,7 @@ in
         description = "Encrypted copy of the Garage buckets to Cloudflare R2";
         after = [ "garage-setup.service" ];
         requires = [ "garage-setup.service" ];
+        unitConfig.RequiresMountsFor = [ "/mnt/btrfs" ];
         path = [ pkgs.rclone pkgs.gawk pkgs.jq ];
         environment = {
           RCLONE_CONFIG_GARAGE_TYPE = "s3";
@@ -141,6 +142,10 @@ in
           export RCLONE_CONFIG_OFFSITE_PASSWORD=$(rclone obscure "$CRYPT_PASSWORD")
           export RCLONE_CONFIG_OFFSITE_PASSWORD2=$(rclone obscure "$CRYPT_SALT")
           rclone sync GARAGE:cnpg OFFSITE:cnpg --transfers 4 --stats-one-line -v
+          # OpenBao: the latest hourly snapshot of its data (snapshots.nix), encrypted like the rest.
+          # It holds the application secrets: the one thing no manifest can recreate.
+          snap=$(ls -d /mnt/btrfs/@snapshots/@openbao.* | tail -n 1)
+          rclone sync "$snap" OFFSITE:openbao --transfers 4 --stats-one-line -v
           # R2 free tier: 10 GB stored. Fail (-> OffsiteCopyFailed) from 8 GB, while there is time.
           bytes=$(rclone size --json OFFSITE:cnpg | jq .bytes)
           echo "offsite copy: $bytes bytes"
