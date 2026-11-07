@@ -43,7 +43,7 @@
                   "/@nix" = { mountpoint = "/nix"; mountOptions = opts; };
                   "/@log" = { mountpoint = "/var/log"; mountOptions = opts; };
                   "/@microvms" = { mountpoint = "/var/lib/microvms"; mountOptions = opts; };
-                  # SeaweedFS volume data (phase 4): shared with the k3s VM, not snapshotted.
+                  # SeaweedFS volume data (phase 4): shared with the k3s VM, daily snapshots (snapshots.nix).
                   "/@seaweed" = { mountpoint = "/srv/seaweed"; mountOptions = opts; };
                   # OpenBao data: snapshotted hourly (snapshots.nix), shared with the k3s VM.
                   "/@openbao" = { mountpoint = "/srv/openbao"; mountOptions = opts; };

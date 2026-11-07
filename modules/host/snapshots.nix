@@ -24,6 +24,9 @@
         volume."/mnt/btrfs" = {
           snapshot_dir = "@snapshots";
           subvolume."@openbao" = { };
+          # The music library has no other copy than the DAP: dailies only, a deleted file
+          # keeps holding disk space until its last snapshot expires.
+          subvolume."@seaweed".snapshot_preserve = "14d";
         };
       };
     };
