@@ -16,7 +16,9 @@
     # Hardware only. The VM of nuc1 is kube-0 (.210); its memory is derived from `ram`
     # (_lib.nix, reserves) and printed by:
     #   nix eval .#nixosConfigurations.nuc1.config.microvm.vms.kube-0.config.config.microvm.mem
-    hosts.nuc1 = { id = 0; ram = 16384; cores = 12; };
+    # dataDisk 64 GiB: the paperclip image alone unpacks to ~10 GB (2026-11-07, 84% of 32 GiB).
+    # microvm.nix does not grow an existing image: docs/runbooks/grow-vm-disk.md.
+    hosts.nuc1 = { id = 0; ram = 16384; cores = 12; dataDisk = 65536; };
 
     clusters.homelab = {
       servers = [ "nuc1" ];
