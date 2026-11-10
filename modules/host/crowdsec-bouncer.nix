@@ -11,11 +11,50 @@
 { config, ... }:
 let
   inherit (config) cluster;
+  vpnPort = cluster.vpn.port;
 in
 {
-  flake.modules.nixos.crowdsec-bouncer = { config, lib, ... }:
+  flake.modules.nixos.crowdsec-bouncer = { config, lib, pkgs, ... }:
     let
       clusterLib = import ../topology/_lib.nix { inherit lib; };
+      # The VPN entry points (wg0, Tailscale direct connections) stay reachable from banned
+      # addresses: they are the break-glass, and a UDP port that answers only to a valid key
+      # tells a scanner nothing. The bouncer runs in set-only mode: it fills the sets, and
+      # these rules (ours, so the exception can be written) drop. An accept in another chain
+      # would not do: a drop in any base chain of a hook is final.
+      vpnPorts = "{ ${toString vpnPort}, ${toString config.services.tailscale.port} }";
+      rules = pkgs.writeText "crowdsec.nft" ''
+        # create then delete: a first start has nothing to delete, a restart has the old table
+        table ip crowdsec
+        delete table ip crowdsec
+        table ip6 crowdsec6
+        delete table ip6 crowdsec6
+
+        table ip crowdsec {
+          set crowdsec-blacklists { type ipv4_addr; flags timeout; }
+          chain input {
+            type filter hook input priority -10; policy accept;
+            ip saddr @crowdsec-blacklists udp dport ${vpnPorts} accept
+            ip saddr @crowdsec-blacklists drop
+          }
+          chain forward {
+            type filter hook forward priority -10; policy accept;
+            ip saddr @crowdsec-blacklists drop
+          }
+        }
+        table ip6 crowdsec6 {
+          set crowdsec6-blacklists { type ipv6_addr; flags timeout; }
+          chain input {
+            type filter hook input priority -10; policy accept;
+            ip6 saddr @crowdsec6-blacklists udp dport ${vpnPorts} accept
+            ip6 saddr @crowdsec6-blacklists drop
+          }
+          chain forward {
+            type filter hook forward priority -10; policy accept;
+            ip6 saddr @crowdsec6-blacklists drop
+          }
+        }
+      '';
     in
     lib.mkIf (clusterLib.k3sVmOf cluster config.networking.hostName != null) {
       networking.firewall.extraCommands = "iptables -A nixos-fw -p tcp -s ${clusterLib.hostAddress cluster (clusterLib.hostOf cluster "monitoring")} --dport 60601 -j nixos-fw-accept\n";
@@ -32,7 +71,13 @@ in
       # Until the cluster (and so the LAPI) is up the bouncer cannot start: keep trying.
       systemd.services.crowdsec-firewall-bouncer = {
         unitConfig.StartLimitIntervalSec = 0;
-        serviceConfig = { Restart = "on-failure"; RestartSec = "30s"; };
+        serviceConfig = {
+          Restart = "on-failure";
+          RestartSec = "30s";
+          # "+": full privileges (the unit itself runs as a dynamic user). Before the module's
+          # own pre-steps, and after the previous process stopped: no race with its cleanup.
+          ExecStartPre = lib.mkBefore [ "+${lib.getExe pkgs.nftables} -f ${rules}" ];
+        };
       };
 
       services.crowdsec-firewall-bouncer = {
@@ -43,10 +88,11 @@ in
           mode = "nftables";
           api_url = "http://${(clusterLib.theCluster cluster).ingress.lapiAddress}:8080/";
           update_frequency = "10s";
-          # The bouncer creates and owns its tables (crowdsec, crowdsec6) and their chains.
+          # set-only: the tables, sets and rules are ours (rules above); the bouncer only
+          # fills the sets (crowdsec-blacklists, crowdsec6-blacklists) and empties them on stop.
           nftables = {
-            ipv4.set-only = false;
-            ipv6.set-only = false;
+            ipv4 = { set-only = true; table = "crowdsec"; };
+            ipv6 = { set-only = true; table = "crowdsec6"; };
           };
           nftables_hooks = [ "input" "forward" ];
           prometheus = {             # scraped by VictoriaMetrics (monitoring.nix), from the monitoring host only
