@@ -66,11 +66,11 @@
         services.music-assistant = {
           enable = true;
           openFirewall = true;
-          providers = [ "airplay" "chromecast" "opensubsonic" ];
+          providers = [ "airplay" "chromecast" "opensubsonic" "hass" ];   # hass: log in through Home Assistant
         };
-        # The UI, only from the internal Gateway: music.int.abe.lc, behind Pocket-ID (oauth2-proxy)
-        # then its own login
-        # (homelab-cluster apps/music/music-assistant.yaml). Envoy reaches it from kube-0's address.
+        # The UI, only from the internal Gateway: music.int.abe.lc (homelab-cluster
+        # apps/music/music-assistant.yaml), login through Home Assistant. Envoy reaches it from
+        # kube-0's address.
         networking.firewall.extraCommands =
           "iptables -A nixos-fw -p tcp -s 192.168.1.210 --dport 8095 -j nixos-fw-accept";
       };
