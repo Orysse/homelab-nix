@@ -29,9 +29,11 @@ let
   # The services are the peaks of the units; monitoring grows with every host it scrapes
   # (estimated, not measured: measure again in the add-host runbook).
   reserves = {
-    # 4224 + the 128 the host PostgreSQL used to take (removed with the NFS host): the k3s VM
-    # stays at the approved 9216 MB; the 128 are headroom for the host.
-    base = 4352;
+    # 4224 + the 128 the host PostgreSQL used to take (removed with the NFS host), minus the
+    # guests (2026-11-11: music 512, home 1024): the k3s VM stays at the approved 9216 MB.
+    # Measured then, nuc1 never had less than 4.8 GB available over 7 days; ~3.3 GB expected
+    # with both guests. Need more: drop an app (paperclip), not this headroom.
+    base = 2816;
     vpn = 128;
     monitoring = 1280;
     monitoringPerHost = 128;
@@ -65,7 +67,7 @@ let
 
   hostOf = cluster: service: cluster.services.${service}.on;
 
-  vmsOn = cluster: host: lib.filterAttrs (_: v: v.on == host) cluster.vms;
+  guestsOn = cluster: host: lib.filterAttrs (_: g: g.on == host) cluster.guests;
 
   # RAM of a host's k3s VM: what is left after the reserves, a multiple of 64, never 2048
   # (QEMU hangs, microvm.nix#171).
@@ -79,7 +81,7 @@ let
       raw = cluster.hosts.${host}.ram - reserves.base
         - lib.foldl' (acc: s: acc + reserves.${s} or 0) 0 svc
         - monitoringExtra
-        - lib.foldl' (acc: v: acc + v.mem) 0 (lib.attrValues (vmsOn cluster host));
+        - lib.foldl' (acc: g: acc + g.mem) 0 (lib.attrValues (guestsOn cluster host));
       rounded = raw - lib.mod raw 64;
     in
     if rounded == 2048 then rounded - 64 else rounded;
@@ -124,10 +126,10 @@ let
       clusters = lib.attrValues cluster.clusters;
       k3sMembers = lib.concatMap (k3sHostsOf cluster) clusters;
       k3sVms = map (k3sVmOf cluster) (lib.filter known (lib.unique k3sMembers));
-      extraVms = lib.mapAttrsToList (name: v: v // { inherit name; }) cluster.vms;
-      allIps = map (hostAddress cluster) hostNames ++ map (v: v.address) k3sVms ++ map (v: v.address) extraVms;
+      guests = lib.mapAttrsToList (name: g: g // { inherit name; }) cluster.guests;
+      allIps = map (hostAddress cluster) hostNames ++ map (v: v.address) k3sVms ++ map (g: g.address) guests;
       dupIps = duplicates allIps;
-      dupMacs = duplicates (map (v: v.mac) k3sVms ++ map (v: macOf v.name) extraVms);
+      dupMacs = duplicates (map (v: v.mac) k3sVms ++ map (g: macOf g.name) guests);
       unknownIn = what: hs: map (h: "${what} refers to an unknown host: ${h}") (lib.filter (h: !known h) hs);
     in
     if !staticReady then [ "cluster.network.{subnet,prefixLength,gateway} incomplete" ] else
@@ -159,13 +161,14 @@ let
         "k3s VM ${v.name} would get ${toString v.mem} MB, below the floor of ${toString memFloor} (reserves too large for this host)"
     ) k3sVms
     ++ lib.concatMap (v:
-      unknownIn "vms.${v.name}.on" [ v.on ]
-      ++ lib.optional (lib.stringLength v.name > 12) "VM name longer than 12 characters (tap ${tapOf v.name} > 15): ${v.name}"
+      unknownIn "guests.${v.name}.on" [ v.on ]
+      ++ lib.optional ((v.isolation or "container") == "vm") "guests.${v.name}: isolation = \"vm\" is not implemented yet"
+      ++ lib.optional (lib.stringLength v.name > 12) "guest name longer than 12 characters (tap ${tapOf v.name} > 15): ${v.name}"
       ++ (let o = lastOctet v.address; in
-        lib.optional (o >= 210 && o <= 219) "vms.${v.name}.address is in the k3s VM range .21x: ${v.address}"
-        ++ lib.optional (o >= 10 && o <= 150) "vms.${v.name}.address is in the DHCP range: ${v.address}"
-        ++ lib.optional (o >= 240 && o <= 254) "vms.${v.name}.address is in the LoadBalancer pool: ${v.address}")
-    ) extraVms;
+        lib.optional (o >= 210 && o <= 219) "guests.${v.name}.address is in the k3s VM range .21x: ${v.address}"
+        ++ lib.optional (o >= 10 && o <= 150) "guests.${v.name}.address is in the DHCP range: ${v.address}"
+        ++ lib.optional (o >= 240 && o <= 254) "guests.${v.name}.address is in the LoadBalancer pool: ${v.address}")
+    ) guests;
 
   lanNetworkConfig = cluster: address:
     { MulticastDNS = true; }
@@ -182,6 +185,6 @@ let
     });
 in
 {
-  inherit macOf tapOf validate lanNetworkConfig reserves memFloor
+  inherit macOf tapOf guestsOn validate lanNetworkConfig reserves memFloor
     hostAddress k3sVmOf servicesOn hostOf agentsOf vmIPs serverAddress vmMem theCluster;
 }

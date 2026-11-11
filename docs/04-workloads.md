@@ -44,6 +44,9 @@ Changing the domain = one line in the topology + a deploy.
 folds long strings in the middle of escape sequences. Our manifests are written as JSON:
 nothing is folded.
 
+LAN appliances (D34) are the exception: they need the LAN itself (mDNS, random ports), so
+they are `guests` of a host here, not cluster apps. Today: Music Assistant on `.220`.
+
 ## Adding an app
 
 In `homelab-cluster` (see its README and `docs/onboarding/`), not here.

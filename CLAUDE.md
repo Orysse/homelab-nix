@@ -39,7 +39,7 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
   Healthchecks.io); every host exports its own metrics (`host/telemetry.nix`); Grafana at
   `grafana.int.abe.lc`, in the cluster. Host rule: D22.
 - Identity (D25): Pocket-ID at `auth.abe.lc`; the k3s API server accepts its tokens (topology
-  `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.abe.lc`; Hubble, Lidarr
+  `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.int.abe.lc` (VPN only); Hubble, Lidarr
   and Navidrome behind oauth2-proxy. Groups: `admins` (cluster-admin), `visitors`.
 - Network (D27): Cilium (native routing, kube-proxy replacement, WireGuard, Hubble at
   `hubble.int.abe.lc`), installed by the base (`k3s/cilium.nix`). Flux: Flux Operator +
@@ -48,6 +48,12 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
   hand. k3s pinned to `k3s_1_36`.
 - nuc1: new PSU since 2026-10-11, BIOS power limits. NIC offloads off (e1000e hang,
   2026-10-09).
+- LAN guests (D34): `guests.<name>` in the topology, a systemd-nspawn container on `br0`
+  with its own IP and firewall (`host/guest-containers.nix`). `music` (`.220`): Music
+  Assistant, UI at `music.int.abe.lc` (8095 open to the Gateway, kube-0, only). `home`
+  (`.221`): Home Assistant at `ha.int.abe.lc`, Pocket-ID login (`auth_oidc`, public client
+  `home-assistant`). Music Assistant: oauth2-proxy (Pocket-ID) then its own login, no HA
+  dependency. `isolation = "vm"` is not wired yet.
 - Memory: zram swap in the VM, kubelet LimitedSwap, eviction at 300 Mi. Check real free
   memory before adding an app (collapse of 2026-10-11).
 - Addressing: `docs/facts.md`. Kubeconfigs (outside the repo): `~/.kube/configs/homelab-oidc.yaml`

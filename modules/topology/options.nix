@@ -1,5 +1,5 @@
 # flake-parts level: every host reads the same topology.
-# Hosts are hardware only. Workloads (the cluster, host services, extra VMs) are placed on
+# Hosts are hardware only. Workloads (the cluster, host services, LAN guests) are placed on
 # hosts by name; addresses, VM names, MACs and the k3s VM's memory are derived (_lib.nix).
 { lib, ... }:
 let
@@ -126,13 +126,22 @@ in
       });
     };
 
-    vms = mkOption {
-      description = "Extra microVMs (not the k3s node), placed on a host.";
+    guests = mkOption {
+      description = ''
+        LAN appliances: workloads that must sit on the LAN itself (multicast, random ports)
+        and so do not belong in the cluster. Each runs on a host with its own address and
+        firewall (docs/specs/2026-11-11-lan-guests.md).
+      '';
       default = { };
       type = types.attrsOf (types.submodule {
         options = {
-          on = mkOption { type = types.str; description = "Host that runs the VM."; };
-          mem = mkOption { type = types.ints.positive; description = "RAM in MB, taken from the host's k3s VM."; };
+          on = mkOption { type = types.str; description = "Host that runs the guest."; };
+          isolation = mkOption {
+            type = types.enum [ "container" "vm" ];
+            default = "container";
+            description = "systemd-nspawn container (host kernel) or microVM. Only `container` is implemented.";
+          };
+          mem = mkOption { type = types.ints.positive; description = "RAM in MB: reserved on the host (taken from its k3s VM) and the guest's cap."; };
           address = mkOption { type = types.str; description = "Static IPv4 on the LAN, outside .21x, the DHCP range and the LB pool."; };
           module = mkOption { type = types.deferredModule; default = { }; description = "NixOS module of the guest."; };
         };
