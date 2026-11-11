@@ -59,6 +59,9 @@
       on = "nuc1";
       address = "192.168.1.220";
       mem = 512;
+      # The Chromecasts and the Apple TV are behind the Google Wifi router (192.168.86.0/24, NAT;
+      # no bridge mode with two points): Music Assistant joins that Wi-Fi with nuc1's card.
+      wifi.interface = "wlp0s20f3";   # network and passphrase: sops wifi-music
       # Music Assistant: Navidrome (https://navidrome.int.abe.lc, Subsonic credentials set in
       # its UI) played on the Chromecast Audio, the Google Homes and the AirPlay devices.
       # openFirewall: TCP 8097 (stream), 5000/7000 and UDP 32768-65535 (AirPlay).
@@ -66,13 +69,21 @@
         services.music-assistant = {
           enable = true;
           openFirewall = true;
-          providers = [ "airplay" "chromecast" "opensubsonic" "hass" ];   # hass: log in through Home Assistant
+          providers = [ "airplay" "chromecast" "opensubsonic" "hass" "spotify" ];   # hass: log in through Home Assistant
         };
+        # nixpkgs' build lacks the app ids official images bundle (app_secrets.json): our own
+        # Spotify app (developer.spotify.com, owner's account; users allowed in its User Management).
+        # A public PKCE client id, not a secret.
+        systemd.services.music-assistant.environment.MASS_APP_VAR_SPOTIFY_CLIENT_ID = "68d0983293f244e0993226c706587254";
         # The UI, only from the internal Gateway: music.int.abe.lc (homelab-cluster
         # apps/music/music-assistant.yaml), login through Home Assistant. Envoy reaches it from
         # kube-0's address.
         networking.firewall.extraCommands =
           "iptables -A nixos-fw -p tcp -s 192.168.1.210 --dport 8095 -j nixos-fw-accept";
+        # shortcut: with the Wi-Fi up, Music Assistant's DNS lookups time out while it starts (cause
+        # not found; fine afterwards), so its Navidrome and HA providers failed to load. The names
+        # it needs at start are pinned here (internal Gateway); find the cause if more names fail.
+        networking.hosts."192.168.1.241" = [ "navidrome.int.abe.lc" "ha.int.abe.lc" ];
       };
     };
 

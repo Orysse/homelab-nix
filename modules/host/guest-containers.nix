@@ -17,14 +17,42 @@ in
     in
     {
       containers = lib.mapAttrs
-        (_: g: {
+        (name: g: {
           autoStart = true;
           privateNetwork = true;
           hostBridge = "br0";
           localAddress = "${g.address}/${toString cluster.network.prefixLength}";
           privateUsers = "pick";   # the container's root is not the host's
+          # nspawn moves a wireless interface with its phy. The passphrase goes in as a credential:
+          # a bind-mounted root-only file is unreadable for the remapped root.
+          interfaces = lib.optional (g.wifi != null) g.wifi.interface;
+          extraFlags = lib.optional (g.wifi != null)
+            "--load-credential=wifi:${config.sops.secrets."wifi-${name}".path}";
           config = {
-            imports = [ g.module ];
+            imports = [ g.module ] ++ lib.optional (g.wifi != null) {
+              networking.wireless = {
+                enable = true;
+                interfaces = [ g.wifi.interface ];
+                # Its sandbox binds /dev/rfkill, absent in a container; the container is the sandbox.
+                enableHardening = false;
+                # The whole network block (SSID and passphrase) is the secret.
+                extraConfigFiles = [ "/run/credentials/wpa_supplicant-${g.wifi.interface}.service/wifi" ];
+              };
+              systemd.services."wpa_supplicant-${g.wifi.interface}" = {
+                serviceConfig.ImportCredential = "wifi";
+                # No udev in a container: the .device unit it waits for never appears. nspawn
+                # moves the card in before the container boots.
+                requires = lib.mkForce [ ];
+                after = lib.mkForce [ ];
+              };
+              networking.interfaces.${g.wifi.interface}.useDHCP = true;
+              # The LAN (eth0) keeps the default route and DNS; the Wi-Fi side is for its devices only.
+              networking.dhcpcd.extraConfig = ''
+                interface ${g.wifi.interface}
+                nogateway
+                nohook resolv.conf
+              '';
+            };
             networking.defaultGateway = cluster.network.gateway;
             networking.nameservers = cluster.network.dns;
             # The host's resolver (resolved, 127.0.0.53) is out of reach from another netns.
@@ -41,5 +69,8 @@ in
           serviceConfig.MemoryMax = "${toString g.mem}M";
         })
         guests;
+
+      sops.secrets = lib.mapAttrs' (name: _: lib.nameValuePair "wifi-${name}" { })
+        (lib.filterAttrs (_: g: g.wifi != null) guests);
     };
 }

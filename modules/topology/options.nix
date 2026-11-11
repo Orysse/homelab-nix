@@ -144,6 +144,20 @@ in
           mem = mkOption { type = types.ints.positive; description = "RAM in MB: reserved on the host (taken from its k3s VM) and the guest's cap."; };
           address = mkOption { type = types.str; description = "Static IPv4 on the LAN, outside .21x, the DHCP range and the LB pool."; };
           module = mkOption { type = types.deferredModule; default = { }; description = "NixOS module of the guest."; };
+          wifi = mkOption {
+            description = ''
+              A Wi-Fi network the guest joins too, with the host's card handed over whole (the host
+              never joins it). For devices behind another router (no default route there). The
+              network is the host's sops secret `wifi-<guest>`: a wpa_supplicant block
+              `network={ ssid="..." psk="..." }` (nothing about it in the repository).
+            '';
+            default = null;
+            type = types.nullOr (types.submodule {
+              options = {
+                interface = mkOption { type = types.str; description = "Host Wi-Fi interface, e.g. wlp0s20f3."; };
+              };
+            });
+          };
         };
       });
     };
