@@ -26,12 +26,11 @@ in
     {
       homelab-host.nixos.imports = with m; [
         base boot users-ssh disk-layout network-bridge cluster-assertions k3s-token secrets
-        crowdsec-bouncer telemetry snapshots guest-containers
+        crowdsec-bouncer telemetry snapshots guest-containers beszel-agent
       ];
-      vpn.nixos.imports = with m; [ wireguard wireguard-exporter tailscale ddns ];
-      monitoring.nixos.imports = with m; [ monitoring alerting ];
+      vpn.nixos.imports = with m; [ wireguard tailscale ddns ];
+      monitoring.nixos.imports = with m; [ monitoring heartbeat beszel-hub ];
       backup.nixos.imports = [ m.garage ];
-      scanner.nixos.imports = [ m.trivy ];
       k3s-node.nixos.imports = [ m.microvm-guest m.k3s-node ];
     }
     # The guest of each host: the k3s node, with the VM's own settings.

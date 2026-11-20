@@ -34,10 +34,7 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
   btrbk snapshots). No NFS, no PostgreSQL on the host. Databases: CloudNativePG in the
   cluster (ADR 0006), backups in Garage on nuc1 (`host/garage.nix`), copied daily and
   encrypted to Cloudflare R2 (D31; stays under 8 GB, the unit fails above).
-- Monitoring (D23): VictoriaMetrics, VictoriaLogs, vmalert, Alertmanager on nuc1 (alerts
-  emailed from homelab@abe.lc to the owner's address, sops `alert-email`; heartbeat to
-  Healthchecks.io); every host exports its own metrics (`host/telemetry.nix`); Grafana at
-  `grafana.int.abe.lc`, in the cluster. Host rule: D22.
+- Monitoring (D35, replaces D23): Beszel (hub and agents, `host/beszel.nix`) for hosts and the alerts it sends; VictoriaLogs on nuc1 as a log store (30 days, journal of every host, read over an SSH tunnel with vmui); heartbeat to Healthchecks.io from a timer (`host/heartbeat.nix`). No VictoriaMetrics, vmalert, Alertmanager, Trivy or Grafana. Host rule: D22.
 - Identity (D25): Pocket-ID at `auth.abe.lc`; the k3s API server accepts its tokens (topology
   `oidc`, `k3s/node.nix`). kubectl via kubelogin, Headlamp at `k8s.int.abe.lc` (VPN only); Hubble, Lidarr
   and Navidrome behind oauth2-proxy (Navidrome trusts its user header). Groups: `admins` (cluster-admin), `visitors`.

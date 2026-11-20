@@ -57,7 +57,6 @@ in
       '';
     in
     lib.mkIf (clusterLib.k3sVmOf cluster config.networking.hostName != null) {
-      networking.firewall.extraCommands = "iptables -A nixos-fw -p tcp -s ${clusterLib.hostAddress cluster (clusterLib.hostOf cluster "monitoring")} --dport 60601 -j nixos-fw-accept\n";
       boot.kernelModules = [ "br_netfilter" ];
       boot.kernel.sysctl = {
         "net.bridge.bridge-nf-call-iptables" = 1;
@@ -95,11 +94,6 @@ in
             ipv6 = { set-only = true; table = "crowdsec6"; };
           };
           nftables_hooks = [ "input" "forward" ];
-          prometheus = {             # scraped by VictoriaMetrics (monitoring.nix), from the monitoring host only
-            enabled = true;
-            listen_addr = clusterLib.hostAddress cluster config.networking.hostName;
-            listen_port = 60601;
-          };
         };
       };
     };
