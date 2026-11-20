@@ -45,7 +45,7 @@ One file, `modules/topology/topology.nix` (schema in `options.nix`, derivations 
 ```nix
 hosts.nuc1 = { id = 0; ram = 16384; cores = 12; };     # hardware only
 clusters.homelab = { servers = [ "nuc1" ]; gitops.url = …; oidc = …; ingress = …; };
-services = { vpn.on = "nuc1"; monitoring.on = "nuc1"; backup.on = "nuc1" };
+services = { vpn.on = "nuc1"; monitoring.on = "nuc1"; backup.on = "nuc1"; scanner.on = [ "nuc1" ]; };
 ```
 
 - **Derived, not written**: host address `.20<id>`, k3s VM `kube-<id>` at `.21<id>`, MAC and
@@ -55,7 +55,7 @@ services = { vpn.on = "nuc1"; monitoring.on = "nuc1"; backup.on = "nuc1" };
 - **den** (`modules/den/`, ADR in D30) turns the topology into entities: one host per
   `hosts` entry, its VM as a guest, and the host services placed by `services.<s>.on`. The
   building blocks stay `flake.modules.nixos.*`; den only composes them (aspects `homelab-host`,
-  `vpn`, `monitoring`, `backup`, `k3s-node`).
+  `vpn`, `monitoring`, `backup`, `scanner`, `k3s-node`).
 - Adding a host is data: `docs/runbooks/add-host.md`.
 
 ## 4. Network

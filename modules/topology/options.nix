@@ -118,7 +118,8 @@ in
     services = mkOption {
       description = ''
         Where each host service runs. Placement is always written: nothing moves when a host is
-        added. A singleton (vpn, monitoring, backup) names one host.
+        added. A singleton (vpn, monitoring, backup) names one host; `scanner`
+        is a list, so it can run nowhere.
       '';
       type = types.attrsOf (types.submodule {
         options.on = mkOption { type = types.either types.str (types.listOf types.str); };

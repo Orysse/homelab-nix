@@ -47,9 +47,10 @@
     # Where each host service runs.
     services = {
       vpn.on = "nuc1";          # WireGuard (router: UDP 51820 -> nuc1), Tailscale (UDP 41641), ddclient
-      monitoring.on = "nuc1";   # logs, host dashboard, heartbeat: below the cluster, it works when the cluster does not
+      monitoring.on = "nuc1";   # metrics, logs, alerts: below the cluster, it works when the cluster does not
       # Garage (S3) for PostgreSQL backups, until the NAS arrives (then an address, not a host).
       backup.on = "nuc1";
+      scanner.on = [ "nuc1" ];  # trivy; a list, so it can run nowhere
     };
 
     # LAN appliances (docs/specs/2026-11-11-lan-guests.md): their own address and firewall,

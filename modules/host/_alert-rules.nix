@@ -1,0 +1,150 @@
+# Alert rules evaluated by vmalert on the monitoring host (alerting.nix), against
+# VictoriaMetrics. Imported by alerting.nix (the "_" prefix keeps import-tree away).
+# severity: critical (act now) / warning (look today). Every alert says what to check.
+{ domain }:
+let
+  alert = name: expr: for: severity: summary: description: {
+    alert = name;
+    inherit expr for;
+    labels = { inherit severity; };
+    annotations = { inherit summary description; };
+  };
+in
+{
+  groups = [
+    {
+      name = "host";
+      rules = [
+        (alert "HostRestarted"
+          "time() - node_boot_time_seconds{job=\"node\"} < 900"
+          "0m" "warning"
+          "{{ $labels.host }} restarted"
+          "{{ $labels.host }} booted less than 15 minutes ago. Unplanned? Check the power supply, then `journalctl -b -1 | tail`.")
+        (alert "HostUnitInactive"
+          "node_systemd_unit_state{job=\"node\",state=\"active\",name=~\"microvm@.+|microvm-virtiofsd@.+|sshd.service|systemd-networkd.service|victoria.+|vmalert.+|alertmanager.service|ddclient.timer|btrbk-data.timer|trivy-scan.timer|garage-offsite.timer\"} == 0"
+          "5m" "critical"
+          "{{ $labels.host }}: {{ $labels.name }} is not active"
+          "`systemctl status {{ $labels.name }}` and `journalctl -u {{ $labels.name }} -n 50` on {{ $labels.host }}.")
+        (alert "OffsiteCopyFailed"
+          "node_systemd_unit_state{job=\"node\",state=\"failed\",name=\"garage-offsite.service\"} == 1"
+          "0m" "warning"
+          "{{ $labels.host }}: the offsite copy of the backups failed or is over 8 GB"
+          "`journalctl -u garage-offsite -n 50` on {{ $labels.host }}: expired R2 token, the network, or the copy nearing the 10 GB R2 free tier (barman retention, `rclone size`).")
+        (alert "HostDiskFilling"
+          "1 - node_filesystem_avail_bytes{job=\"node\",fstype=\"btrfs\"} / node_filesystem_size_bytes{job=\"node\",fstype=\"btrfs\"} > 0.85"
+          "30m" "warning"
+          "{{ $labels.host }}: {{ $labels.mountpoint }} is {{ $value | humanizePercentage }} full"
+          "Old generations (`nix-collect-garbage -d`), journals, btrbk snapshots, VM data volumes.")
+        (alert "HostSmartFailing"
+          "smartctl_device_smart_status == 0"
+          "0m" "critical"
+          "{{ $labels.host }}: disk {{ $labels.device }} reports a SMART failure"
+          "The disk itself says it is failing. Check backups first, then `smartctl -a /dev/{{ $labels.device }}`.")
+        (alert "MemoryLow"
+          "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.1"
+          "15m" "warning"
+          "{{ $labels.host }}{{ $labels.node }}: less than 10% memory available"
+          "VM sizes are in topology.nix; `kubectl top pods -A --sort-by=memory` for the cluster.")
+      ];
+    }
+    {
+      name = "cluster";
+      rules = [
+        (alert "ClusterNotReporting"
+          "absent(up{job=\"kubelet\"} == 1)"
+          "10m" "critical"
+          "The cluster sends no metrics"
+          "No kubelet scraped for 10 minutes: VMs down, Alloy down, or the network between them and the monitoring host.")
+        (alert "NodeMetricsMissing"
+          "kube_node_info unless on(node) label_replace(up{job=\"kubelet\"} == 1, \"node\", \"$1\", \"instance\", \"(.*)\")"
+          "15m" "warning"
+          "No metrics from node {{ $labels.node }}"
+          "The node exists but its Alloy sends nothing (stuck, crashed, or cut off). `kubectl -n monitoring get pods -l app.kubernetes.io/name=alloy -o wide`.")
+        (alert "KubeNodeNotReady"
+          "kube_node_status_condition{condition=\"Ready\",status=\"true\"} == 0"
+          "10m" "critical"
+          "Node {{ $labels.node }} is NotReady"
+          "Is its VM running (HostUnitInactive)? `kubectl describe node {{ $labels.node }}`.")
+        (alert "PodCrashLooping"
+          "max_over_time(kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\"}[5m]) >= 1"
+          "10m" "warning"
+          "{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is crash-looping"
+          "`kubectl -n {{ $labels.namespace }} logs {{ $labels.pod }} -c {{ $labels.container }} --previous`.")
+        (alert "DeploymentUnavailable"
+          "kube_deployment_status_replicas_unavailable > 0"
+          "15m" "warning"
+          "{{ $labels.namespace }}/{{ $labels.deployment }} is missing replicas"
+          "Image pull, probes or scheduling: `kubectl -n {{ $labels.namespace }} describe deploy {{ $labels.deployment }}`.")
+        (alert "ContainerOOMKilled"
+          "increase(kube_pod_container_status_restarts_total[15m]) > 0 and on (namespace, pod, container) kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\"} == 1"
+          "0m" "warning"
+          "{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) was OOM-killed"
+          "Its memory limit is too low, or it leaks. Compare with `resources.limits.memory`.")
+      ];
+    }
+    {
+      name = "gitops";
+      rules = [
+        (alert "FluxNotReady"
+          "gotk_resource_info{ready=\"False\"} == 1"
+          "15m" "warning"
+          "Flux {{ $labels.customresource_kind }} {{ $labels.name }} is not ready"
+          "Git is not being applied. `flux get all -A`, `flux events -A --types=Warning` (docs/cheatsheet.md).")
+      ];
+    }
+    {
+      name = "apps";
+      rules = [
+        (alert "StatusCheckFailing"
+          "gatus_results_endpoint_success == 0"
+          "5m" "critical"
+          "{{ $labels.name }} is failing its status check"
+          "See https://status.${domain}: wrong status, slow, DNS, or certificate expiring in under 14 days.")
+        (alert "CertificateExpiring"
+          "certmanager_certificate_expiration_timestamp_seconds - time() < 14 * 86400"
+          "1h" "warning"
+          "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in under 14 days"
+          "cert-manager should have renewed it 30 days before: `kubectl -n {{ $labels.namespace }} describe certificate {{ $labels.name }}`.")
+        # CloudNativePG (homelab-cluster postgres/): a base backup every night to Garage.
+        (alert "PostgreSQLBackupStale"
+          "time() - cnpg_collector_last_available_backup_timestamp > 30 * 3600"
+          "1h" "critical"
+          "No PostgreSQL backup for more than 30 hours"
+          "`kubectl cnpg status -n postgres main` (Continuous Backup status), then `kubectl -n postgres get backups`. Garage on the backup host: `garage status`.")
+      ];
+    }
+    {
+      # Daily Trivy scan of the running images, on the monitoring host (trivy.nix). Only what
+      # can be acted on alerts: a critical vulnerability with a fixed version (update the
+      # image), and the scan itself not running.
+      name = "security";
+      rules = [
+        (alert "ImageCriticalVulnerabilityFixable"
+          "max by (image) (trivy_image_vulnerabilities_fixable{severity=\"CRITICAL\"}) > 0"
+          "0m" "warning"
+          "{{ $labels.image }}: {{ $value }} critical vulnerabilities with a fix available"
+          "Update the image (a Renovate PR may already be waiting). Details on the monitoring host: `trivy image --scanners vuln --severity CRITICAL {{ $labels.image }}`.")
+        (alert "ImageScanFailed"
+          "trivy_image_scan_success == 0"
+          "0m" "warning"
+          "Trivy could not scan {{ $labels.image }}"
+          "Registry rate limit or unreachable, or an unsupported image. `journalctl -u trivy-scan` on the monitoring host.")
+        (alert "ImageScanStale"
+          "time() - trivy_last_run_timestamp_seconds > 2 * 86400"
+          "0m" "warning"
+          "No vulnerability scan for 2 days"
+          "`systemctl status trivy-scan.timer trivy-scan.service` on the monitoring host.")
+      ];
+    }
+    {
+      # Always firing. Alertmanager pings Healthchecks.io with it every minute, which alerts
+      # when the pings STOP (monitoring host dead, power cut, internet down).
+      name = "meta";
+      rules = [
+        (alert "Watchdog" "vector(1)" "0m" "none"
+          "Alerting pipeline is alive"
+          "Always firing on purpose.")
+      ];
+    }
+  ];
+}

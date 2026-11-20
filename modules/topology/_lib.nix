@@ -33,13 +33,12 @@ let
     # guests (2026-11-11: music 512, home 1024): the k3s VM stays at the approved 9216 MB.
     # Measured then, nuc1 never had less than 4.8 GB available over 7 days; ~3.3 GB expected
     # with both guests. Need more: drop an app (paperclip), not this headroom.
-    # + 1280 that the Trivy scan used to take (removed with VictoriaMetrics, 2026-11-20): kept as
-    # host headroom, the k3s VM stays at 9216 MB.
-    base = 4096;
+    base = 2816;
     vpn = 128;
     monitoring = 1280;
     monitoringPerHost = 128;
     backup = 128;
+    scanner = 1280;
   };
 
   # Floor for a k3s VM: the size approved for nuc1 (9216) minus 25%. Below it the check
