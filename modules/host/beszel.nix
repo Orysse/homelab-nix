@@ -5,14 +5,15 @@
 # oauth2-proxy there: the route stamps the admin's email in X-Beszel-Email, and the hub trusts
 # that header only from the k3s VMs (TRUSTED_PROXY_IPS), the only addresses the firewall lets in.
 # The hub polls each agent over SSH: the agent holds the hub's public key (not a secret) and
-# listens on loopback only. Two steps, because the hub makes its key on first start:
+# listens on loopback only. Setting it up took two steps, because the hub makes its key on first
+# start (a new hub: deploy with hubPublicKey = null, then paste the key below):
 #   1. deploy with hubPublicKey = null (hub only), open the UI, create the admin, "Add System"
 #      (host 127.0.0.1, port 45876), copy the public key it shows
 #   2. paste it in hubPublicKey and deploy again: the agent starts
 { config, ... }:
 let
   inherit (config) cluster;
-  hubPublicKey = null; # "ssh-ed25519 AAAA…"
+  hubPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFozZEs9BNQdVDx6BdkGdbBqXcB+32Q8nHY2YWq7SLoe"; # the hub's public key (its UI: Add System)
 in
 {
   flake.modules.nixos.beszel-hub = { config, lib, ... }:
