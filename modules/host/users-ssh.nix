@@ -7,6 +7,7 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBq0gKJgexGHmwZDov74uTUmYYKhg5zqPeQLwZFabCvp abel@thinkpad"
       # Lenny, cluster admin: root on the hosts and the VMs.
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMr5vQB5PdB55C8FbVuQQjuBoSOeus+X+Wi9Kf45Rmko lenny@Lenny"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGeScEfU+/o29o3ahA3v1qnc28uORnGMOOPOhFl4NDWw lenny@lennyAsNIX"
     ];
 
     services.openssh = {

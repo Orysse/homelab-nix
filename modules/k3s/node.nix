@@ -32,6 +32,10 @@ in
         fsType = "ext4";
       }];
 
+      # NFS client (mount.nfs, kernel module) for kubelet's `nfs:` volumes: the music library on
+      # the family NAS (homelab-cluster apps/music, D35).
+      boot.supportedFilesystems.nfs = true;
+
       # The kernel parameters kubelet expects with --protect-kernel-defaults (it no longer sets
       # them itself, and refuses to start otherwise; the microVM boots with kernel.panic=-1).
       boot.kernel.sysctl = {

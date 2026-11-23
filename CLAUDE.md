@@ -49,11 +49,12 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 - nuc1: new PSU since 2026-10-11, BIOS power limits. NIC offloads off (e1000e hang,
   2026-10-09).
 - LAN guests (D34): `guests.<name>` in the topology, a systemd-nspawn container on `br0`
-  with its own IP and firewall (`host/guest-containers.nix`). `music` (`.220`): Music
-  Assistant, UI at `music.int.abe.lc` (8095 open to the Gateway, kube-0, only). `home`
-  (`.221`): Home Assistant at `ha.int.abe.lc`, Pocket-ID login (`auth_oidc`, public client
-  `home-assistant`). Music Assistant: login through Home Assistant (provider `hass`), so
-  Pocket-ID only. `isolation = "vm"` is not wired yet.
+  with its own IP and firewall (`host/guest-containers.nix`). None since 2026-11-24: Music
+  Assistant and Home Assistant were removed (unused); their 1536 MB went to
+  `reserves.base`, kube-0 stays at 9216. `isolation = "vm"` is not wired yet.
+- Music library: moving from SeaweedFS to the family NAS (Synology, `192.168.1.151`, NFS to
+  kube-0, in the VPN routes); draft in homelab-cluster
+  `docs/superpowers/specs/2026-11-24-music-on-nas.md` (D35, revises D32 for the music).
 - Memory: zram swap in the VM, kubelet LimitedSwap, eviction at 300 Mi. Check real free
   memory before adding an app (collapse of 2026-10-11).
 - Addressing: `docs/facts.md`. Kubeconfigs (outside the repo): `~/.kube/configs/homelab-oidc.yaml`
