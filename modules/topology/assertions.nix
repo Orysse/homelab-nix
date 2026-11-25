@@ -46,7 +46,7 @@ in
 
         # The derived size is the one the owner approved, and never exactly 2048.
         topology-derives-approved-memory =
-          assert clusterLib.vmMem cluster "nuc1" == 9216;
+          assert clusterLib.vmMem cluster "nuc1" == 10752;   # approved by the owner 2026-11-25 (was 9216)
           assert clusterLib.vmMem (lib.recursiveUpdate cluster { hosts.nuc1.ram = 2048 + 7168; }) "nuc1" != 2048;
           pkgs.runCommand "topology-derives-approved-memory" { } "touch $out";
       };

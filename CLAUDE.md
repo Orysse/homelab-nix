@@ -9,7 +9,7 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 ## Current state
 
 - Hosts and VMs: nuc1 (`192.168.1.200`, host id 0) runs one k3s VM, `kube-0` (`.210`,
-  server, embedded etcd), 9216 MB: derived from the host's RAM minus the reserves of what
+  server, embedded etcd), 10752 MB: derived from the host's RAM minus the reserves of what
   runs on it, floor 6912 MB (`modules/topology/_lib.nix`, checked by `nix flake check`).
   Never change a VM's size or limits without the owner's OK: the VM is the only node.
   A new host is data only: `docs/runbooks/add-host.md`.
@@ -51,7 +51,7 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 - LAN guests (D34): `guests.<name>` in the topology, a systemd-nspawn container on `br0`
   with its own IP and firewall (`host/guest-containers.nix`). None since 2026-11-24: Music
   Assistant and Home Assistant were removed (unused); their 1536 MB went to
-  `reserves.base`, kube-0 stays at 9216. `isolation = "vm"` is not wired yet.
+  `reserves.base`; on 2026-11-25 they went to kube-0 (10752, for the media stack). `isolation = "vm"` is not wired yet.
 - Music library: moving from SeaweedFS to the family NAS (Synology, `192.168.1.151`, NFS to
   kube-0, in the VPN routes); draft in homelab-cluster
   `docs/superpowers/specs/2026-11-24-music-on-nas.md` (D35, revises D32 for the music).

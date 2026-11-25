@@ -33,9 +33,10 @@ let
     # guests (2026-11-11: music 512, home 1024): the k3s VM stays at the approved 9216 MB.
     # Measured then, nuc1 never had less than 4.8 GB available over 7 days; ~3.3 GB expected
     # with both guests. Need more: drop an app (paperclip), not this headroom.
-    # 2026-11-24: both guests removed (unused); their 1536 went back here (owner's choice), so
-    # kube-0 stays at 9216 and the host keeps 1.5 GB more headroom.
-    base = 4352;
+    # 2026-11-24: both guests removed (unused); their 1536 went back here (owner's choice).
+    # 2026-11-25: back to kube-0 (owner's choice, for the media stack: kube-0 was at 75% of its RAM):
+    # 9216 + 1536 = 10752 MB. The host is back to the 2816 measured with both guests.
+    base = 2816;
     vpn = 128;
     monitoring = 1280;
     monitoringPerHost = 128;
