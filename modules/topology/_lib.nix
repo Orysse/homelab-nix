@@ -48,6 +48,11 @@ let
   # fails instead of starving the cluster.
   memFloor = 6912;
 
+  # The video NAS (Lenny's Synology, tailnet node `home-nas`): a Tailscale address, stable whatever
+  # DHCP gives it at his place. kube-0 is not on the tailnet: it reaches this one address through
+  # the host that runs the VPN (route in microvm-guest.nix, NAT in tailscale.nix), NFS only.
+  videoNas = "100.64.0.10";
+
   singletons = [ "vpn" "monitoring" "backup" ];
 
   octets = cluster: lib.concatStringsSep "." (lib.take 3 (lib.splitString "." cluster.network.subnet));
@@ -189,5 +194,6 @@ let
 in
 {
   inherit macOf tapOf guestsOn validate lanNetworkConfig reserves memFloor
+    videoNas
     hostAddress k3sVmOf servicesOn hostOf agentsOf vmIPs serverAddress vmMem theCluster;
 }

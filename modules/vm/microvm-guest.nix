@@ -70,6 +70,11 @@ in
         networkConfig = clusterLib.lanNetworkConfig cluster spec.address // {
           IPv6AcceptRA = false;
         };
+        # The video NAS, over the tailnet, through the VPN host (tailscale.nix masquerades it).
+        routes = [{
+          Destination = "${clusterLib.videoNas}/32";
+          Gateway = clusterLib.hostAddress cluster (clusterLib.hostOf cluster "vpn");
+        }];
       };
 
       # The node's journal (k3s, kubelet, API audit) into VictoriaLogs on the monitoring host.
