@@ -55,6 +55,13 @@ to carry a real stack. The owner is also preparing an interview at Datadog.
 - Music library: moving from SeaweedFS to the family NAS (Synology, `192.168.1.151`, NFS to
   kube-0, in the VPN routes); draft in homelab-cluster
   `docs/superpowers/specs/2026-11-24-music-on-nas.md` (D35, revises D32 for the music).
+- Films and series (2026-11-25; spec homelab-cluster `docs/superpowers/specs/2026-11-25-media-stack.md`):
+  Radarr, Sonarr, Prowlarr, Jellyfin, Seerr in `apps/media`, on the video NAS (Lenny's Synology,
+  tailnet node `home-nas` `100.64.0.10`, `/volume1/ABEL`, NFSv4.1). kube-0 is not on the tailnet:
+  its `/32` route goes through nuc1, which masquerades NFS 2049 into `tailscale0`
+  (`host/tailscale.nix`, `vm/microvm-guest.nix`, `videoNas` in `_lib.nix`); Headscale policy:
+  nuc1 -> home-nas:2049 only. The NAS exports to `100.64.0.1`. Hard mount over the Internet:
+  Lenny's NAS or line down hangs the pods that mount it (qBittorrent too).
 - Memory: zram swap in the VM, kubelet LimitedSwap, eviction at 300 Mi. Check real free
   memory before adding an app (collapse of 2026-10-11).
 - Addressing: `docs/facts.md`. Kubeconfigs (outside the repo): `~/.kube/configs/homelab-oidc.yaml`
